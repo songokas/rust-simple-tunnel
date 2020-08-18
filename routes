@@ -1,0 +1,7 @@
+table ip custom-nat {
+	chain postrouting {
+		type nat hook postrouting priority 100; policy accept;
+		oifname "enp4s0" counter masquerade
+		nftrace set 1
+	}
+}

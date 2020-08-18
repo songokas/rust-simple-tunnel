@@ -8,7 +8,7 @@ use std::net::{IpAddr};
 
 pub type RuleSet = Vec<LimitRule>;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub enum LimitType
 {
     // in seconds
@@ -17,7 +17,7 @@ pub enum LimitType
     MaxData(u128),
 }
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq)]
 pub struct LimitRule
 {
     pub address: IpNetwork,
@@ -68,6 +68,7 @@ pub fn load_rules(file_path: &str) -> Result<RuleSet, Error>
 
 fn create_rule(ip: &str, rule_type: &str) -> Result<LimitRule, Error>
 {
+
     let ip_addr: IpNetwork = ip.parse::<IpNetwork>()
         .map_err(|error| Error::new(ErrorKind::InvalidData, error.to_string()))?;
 
@@ -80,4 +81,53 @@ fn create_rule(ip: &str, rule_type: &str) -> Result<LimitRule, Error>
     let rule = duration_rule.or(byte_rule)?;
 
     Ok(rule)
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn rule_success_data_provider() -> Vec<(&'static str, &'static str, LimitRule)>
+    {
+        vec![
+            ("127.0.0.1", "2m", LimitRule::from_duration(&"127.0.0.1".parse::<IpNetwork>().unwrap(), 120)),
+            ("8.8.8.8/32", "12s", LimitRule::from_duration(&"8.8.8.8/32".parse::<IpNetwork>().unwrap(), 12)),
+            ("12.10.0.1/24", "4h", LimitRule::from_duration(&"12.10.0.1/24".parse::<IpNetwork>().unwrap(), 14400)),
+            ("0.0.0.0/0", "2 hours 20 seconds", LimitRule::from_duration(&"0.0.0.0/0".parse::<IpNetwork>().unwrap(), 7220)),
+            ("192.168.0.255/0", "2mb", LimitRule::from_bytes(&"192.168.0.255/0".parse::<IpNetwork>().unwrap(), 2 * 1000 * 1000)),
+            ("1.1.1.1/32", "1.5gb", LimitRule::from_bytes(&"1.1.1.1/32".parse::<IpNetwork>().unwrap(), 15 * 100 * 1000 * 1000)),
+            ("8.8.8.81", "12Kib", LimitRule::from_bytes(&"8.8.8.81".parse::<IpNetwork>().unwrap(), 12 * 1024)),
+        ]
+    }
+
+
+    fn rule_failure_data_provider() -> Vec<(&'static str, &'static str)>
+    {
+        vec![
+            ("127.0.0.1", "2mega"),
+            ("127.0.0.1", "3 children"),
+            ("127.0.0.1", "3 thousand minutes"),
+            ("goo", "3 seconds"),
+            ("12.12.12.12.2", "3 seconds"),
+            ("127.0.0.1", "number1"),
+            ("127.0.0.1", ""),
+        ]
+    }
+
+    #[test]
+    fn create_rule_success_test() {
+        for (ip, limit_type, rule) in rule_success_data_provider() {
+            let result = create_rule(ip, limit_type);
+            assert_eq!(result.unwrap(), rule);
+        }
+    }
+
+    #[test]
+    fn create_rule_failure_test() {
+        for (ip, limit_type) in rule_failure_data_provider() {
+            let result = create_rule(ip, limit_type);
+            assert!(result.is_err());
+        }
+    }
 }
