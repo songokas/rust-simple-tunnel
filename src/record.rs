@@ -21,7 +21,6 @@ impl RouteRecord
     }
 }
 
-
 pub fn get_matching_rule<'a>(rules: &'a RuleSet, ip: &IpAddr) -> Option<&'a LimitRule>
 {
     rules.iter().rev().find(|rule| rule.contains(ip))
@@ -34,8 +33,6 @@ pub fn can_forward(rule: &LimitRule, record: &RouteRecord) -> bool
         LimitType::MaxData(bytes) => bytes > record.data_sent,
     }
 }
-
-
 
 #[cfg(test)]
 mod tests {

@@ -3,11 +3,13 @@ use packet::{ip};
 use tun::{TunPacket};
 use chrono::{Local};
 use std::net::{IpAddr, Ipv4Addr};
-use std::io::{Error};
 use clap::{App, load_yaml};
 use env_logger::Env;
 use log::{info,debug, warn};
 
+#[path = "error.rs"]
+pub mod error;
+use crate::error::{CliError};
 #[path = "record.rs"]
 pub mod record;
 use crate::record::{Records, get_matching_rule, RouteRecord, can_forward};
@@ -87,17 +89,18 @@ async fn process_receive(rules: RuleSet, mut reader: StreamReader, mut writer: S
 }
 
 #[tokio::main]
-async fn main() -> Result<(), Error>
+async fn main() -> Result<(), CliError>
 {
-
     let yaml = load_yaml!("../cli.yml");
     let matches = App::from_yaml(yaml).get_matches();
     let verbosity: u8 = matches.occurrences_of("verbose") as u8;
     let config_path = matches.value_of("config").expect("Please provide configuration file");
-    let interface = matches.value_of("interface").unwrap_or("tun0");
+    let interface_name = matches.value_of("interface-name").unwrap_or("tun0");
+    let interface_ip_str = matches.value_of("interface-ip").unwrap_or("10.0.0.1");
+    let forward_ip_str = matches.value_of("forward-ip").unwrap_or("10.0.0.2");
 
-    let rtunnel_ip = Ipv4Addr::new(10, 0, 0, 1);
-    let stunnel_ip = Ipv4Addr::new(10, 0, 0, 2);
+    let interface_ip = interface_ip_str.parse::<Ipv4Addr>()?;
+    let forward_ip = forward_ip_str.parse::<Ipv4Addr>()?;
 
     env_logger::from_env(Env::default().default_filter_or(match verbosity { 1 => "debug", 2 => "trace", _ => "info"})).init();
 
@@ -105,13 +108,13 @@ async fn main() -> Result<(), Error>
 
     let rules = load_rules(config_path)?;
 
-    let receive_tunnel = create_tunnel(&format!("{}", interface), &rtunnel_ip);
+    let receive_tunnel = create_tunnel(&format!("{}", interface_name), &interface_ip);
     let (rtunnel_sink, rtunnel_stream) = receive_tunnel.into_framed().split();
 
     info!("Waiting for packages");
 
     join!(
-        process_receive(rules, rtunnel_stream, rtunnel_sink, &rtunnel_ip, &stunnel_ip)
+        process_receive(rules, rtunnel_stream, rtunnel_sink, &interface_ip, &forward_ip)
     );
     Ok(())
 }

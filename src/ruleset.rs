@@ -1,10 +1,10 @@
 use ipnetwork::IpNetwork;
 use byte_unit::{Byte};
-use std::io::{Error, ErrorKind};
 use std::io::{BufReader};
 use std::io::prelude::*;
 use std::fs::File;
 use std::net::{IpAddr};
+use crate::error::{CliError, RuleError};
 
 pub type RuleSet = Vec<LimitRule>;
 
@@ -42,7 +42,7 @@ impl LimitRule
     }
 }
 
-pub fn load_rules(file_path: &str) -> Result<RuleSet, Error>
+pub fn load_rules(file_path: &str) -> Result<RuleSet, CliError>
 {
     let file = File::open(file_path)?;
     let reader = BufReader::new(file);
@@ -58,7 +58,7 @@ pub fn load_rules(file_path: &str) -> Result<RuleSet, Error>
             continue;
         }
         let rule = create_rule(ip.unwrap().trim(), rule_type.unwrap().trim())
-            .map_err(|msg| { Error::new(ErrorKind::InvalidData, format!("Syntax error line {} {}", line_number, msg))})?;
+            .map_err(|msg| { CliError::SyntaxError(format!("Syntax error line {} {:?}", line_number, msg))})?;
 
         rules.push(rule);
         line_number += 1;
@@ -66,18 +66,14 @@ pub fn load_rules(file_path: &str) -> Result<RuleSet, Error>
     Ok(rules)
 }
 
-fn create_rule(ip: &str, rule_type: &str) -> Result<LimitRule, Error>
+fn create_rule(ip: &str, rule_type: &str) -> Result<LimitRule, RuleError>
 {
-
-    let ip_addr: IpNetwork = ip.parse::<IpNetwork>()
-        .map_err(|error| Error::new(ErrorKind::InvalidData, error.to_string()))?;
+    let ip_addr: IpNetwork = ip.parse::<IpNetwork>()?;
 
     let byte_rule = Byte::from_str(rule_type)
-        .map(|byte| LimitRule::from_bytes(&ip_addr, byte.get_bytes()))
-        .map_err(|error| Error::new(ErrorKind::InvalidData, error.to_string()));
+        .map(|byte| LimitRule::from_bytes(&ip_addr, byte.get_bytes()));
     let duration_rule = rule_type.parse::<humantime::Duration>()
-        .map(|duration| LimitRule::from_duration(&ip_addr, duration.as_secs()))
-        .map_err(|error| Error::new(ErrorKind::InvalidData, error.to_string()));
+        .map(|duration| LimitRule::from_duration(&ip_addr, duration.as_secs()));
     let rule = duration_rule.or(byte_rule)?;
 
     Ok(rule)
