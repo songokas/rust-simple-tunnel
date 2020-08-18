@@ -56,7 +56,6 @@ pub fn create_packet(packet: &ip::v4::Packet<&[u8]>, forward_with_rtunnel_ip: &I
 mod tests {
     use super::*;
     use packet::{Packet};
-    // use std::net::{IpAddr, Ipv4Addr};
 
     #[test]
     fn create_packet_modify_source_test()

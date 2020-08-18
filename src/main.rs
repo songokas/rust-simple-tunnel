@@ -91,7 +91,7 @@ async fn process_receive(rules: RuleSet, mut reader: StreamReader, mut writer: S
 #[tokio::main]
 async fn main() -> Result<(), CliError>
 {
-    let yaml = load_yaml!("../cli.yml");
+    let yaml = load_yaml!("config/cli.yml");
     let matches = App::from_yaml(yaml).get_matches();
     let verbosity: u8 = matches.occurrences_of("verbose") as u8;
     let config_path = matches.value_of("config").expect("Please provide configuration file");

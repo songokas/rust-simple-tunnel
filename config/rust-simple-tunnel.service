@@ -1,0 +1,11 @@
+[Unit]
+Description=simple rust traffic filter
+After=network.target
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+ExecStart=$BIN_PATH
+
+[Install]
+WantedBy=multi-user.target

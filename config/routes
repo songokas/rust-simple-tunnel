@@ -1,0 +1,10 @@
+table ip rust-simple-tunnel {
+	chain postrouting {
+		type nat hook postrouting priority 100; policy accept;
+		oifname "$network_interface" counter masquerade
+		nftrace set 1
+	}
+	chain forward {
+		type nat hook forward priority 100; policy accept;
+	}
+}
