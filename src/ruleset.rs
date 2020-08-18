@@ -87,6 +87,7 @@ fn create_rule(ip: &str, rule_type: &str) -> Result<LimitRule, Error>
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::net::{IpAddr, Ipv4Addr};
 
     fn rule_success_data_provider() -> Vec<(&'static str, &'static str, LimitRule)>
     {
@@ -129,5 +130,41 @@ mod tests {
             let result = create_rule(ip, limit_type);
             assert!(result.is_err());
         }
+    }
+
+    #[test]
+    fn limit_rule_contains_test()
+    {
+        let rule = LimitRule::from_duration(&"0.0.0.0/0".parse::<IpNetwork>().unwrap(), 100);
+        assert!(rule.contains(&IpAddr::V4(Ipv4Addr::new(127, 0, 0, 2))));
+        let rule = LimitRule::from_duration(&"192.168.0.1/24".parse::<IpNetwork>().unwrap(), 100);
+        assert!(rule.contains(&IpAddr::V4(Ipv4Addr::new(192, 0, 0, 101))));
+        assert!(!rule.contains(&IpAddr::V4(Ipv4Addr::new(192, 0, 1, 101))));
+    }
+
+    #[test]
+    fn load_rules_test()
+    {
+        let expected = vec![
+            LimitRule::from_bytes(&"80.249.99.148/32".parse::<IpNetwork>().unwrap(), 11000000000),
+            LimitRule::from_duration(&"94.142.241.111/24".parse::<IpNetwork>().unwrap(), 120),
+            LimitRule::from_bytes(&"192.168.0.0/24".parse::<IpNetwork>().unwrap(), 2097152),
+            LimitRule::from_duration(&"192.168.0.161".parse::<IpNetwork>().unwrap(), 130),
+            LimitRule::from_bytes(&"127.0.0.1".parse::<IpNetwork>().unwrap(), 1000000000),
+            LimitRule::from_bytes(&"127.0.0.1".parse::<IpNetwork>().unwrap(), 2889999000),
+            LimitRule::from_bytes(&"127.0.0.1".parse::<IpNetwork>().unwrap(), 1100000),
+            LimitRule::from_duration(&"127.0.0.1".parse::<IpNetwork>().unwrap(), 10),
+            LimitRule::from_duration(&"127.0.0.1".parse::<IpNetwork>().unwrap(), 13 * 60),
+            LimitRule::from_duration(&"127.0.0.1".parse::<IpNetwork>().unwrap(), 19 * 3600),
+        ];
+        let rules = load_rules("examples/test.txt").unwrap();
+        assert_eq!(expected, rules);
+    }
+
+    #[test]
+    fn load_rules_failure_test()
+    {
+        assert!(load_rules("examples/error.txt").is_err());
+        assert!(load_rules("examples/not_existing.txt").is_err());
     }
 }

@@ -14,3 +14,9 @@ sudo ./target/release/rust-simple-tunnel -c examples/simple.txt -i tun0 --interf
 to change the rules create a new file or modify existing example and specify it for the command
 
 check examples/advanced.txt
+
+Format for ip must be in cidr notation
+
+Format for bytes 
+
+Format for duration 
