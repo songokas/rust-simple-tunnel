@@ -135,9 +135,7 @@ async fn main() -> Result<(), CliError>
     }
     info!("Waiting for packages");
 
-    join!(
-        process_receive(rules, rtunnel_stream, rtunnel_sink, &interface_ip, &forward_ip)
-    );
+    process_receive(rules, rtunnel_stream, rtunnel_sink, &interface_ip, &forward_ip).await;
     Ok(())
 }
 
