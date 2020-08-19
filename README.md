@@ -7,11 +7,12 @@ simple rust application to filter traffic through tun0 interface
 * cargo - to compile application
 * nft command - for traffic forwarding and masquarade
 * ip command - for traffic rules
+* grep - in setup.sh for rule manipulation
+* awk - in setup.sh for rule manipulation
 
 # How to run
 
-
-Build application
+### Build application
 
 ```
 git clone https://
@@ -19,7 +20,7 @@ cd rust_simple_tunnel
 cargo build --release
 ```
 
-Run application
+### Run application
 
 ```
 sudo ./target/release/rust-simple-tunnel -c examples/simple.txt -i tun0 --interface-ip 10.0.0.1 --forward-ip 10.0.0.2 --verbose
@@ -39,16 +40,16 @@ sudo run.sh
 
 ```
 # become root
-
-sudo bash
-
+sudo -i
 # change according to your needs
 
-USER="tomas" CONFIG_PATH="`pwd`/src/config.yml" BIN_PATH="`pwd`/target/release/heading-control`" envsubst < "services/heating-control.service" > /etc/systemd/system/heating-control.service
+CONFIG_PATH="`pwd`/examples/simple.txt" BIN_PATH="`pwd`/target/release/rust-simple-tunnel`" envsubst < "services/rust-simple-tunnel.service" > /etc/systemd/system/rust-simple-tunnel.service
 
 systemctl daemon-reload
 
-systemctl enable rust-simple-tunnel-control
+systemctl start rust-simple-tunnel
+
+systemctl enable rust-simple-tunnel
 ```
 
 # Ruleset file format

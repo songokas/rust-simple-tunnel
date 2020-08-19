@@ -7,25 +7,25 @@ args:
         short: c
         long: config
         value_name: FILE
-        about: "ruleset file to load"
+        help: "ruleset file to load"
         takes_value: true
     - interface-name:
         short: i
         long: interface-name
-        about: "tun interface name"
+        help: "tun interface name default tun0"
         takes_value: true
     - interface-ip:
         short: p
         long: interface-ip
-        about: "tun interface ip"
+        help: "tun interface ip default 10.0.0.1"
         takes_value: true
     - forward:
         short: f
         long: forward-ip
-        about: "ip used to forward traffic to"
+        help: "ip used to forward traffic further default 10.0.0.2"
         takes_value: true
     - verbose:
         short: v
         long: verbose
         multiple: true
-        about: sets the level of logging verbosity
+        help: sets the level of logging verbosity default info
