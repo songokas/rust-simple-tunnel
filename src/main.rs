@@ -6,6 +6,7 @@ use std::net::{IpAddr, Ipv4Addr};
 use clap::{App, load_yaml};
 use env_logger::Env;
 use log::{info,debug, warn};
+use std::process::Command;
 
 #[path = "error.rs"]
 pub mod error;
@@ -98,6 +99,8 @@ async fn main() -> Result<(), CliError>
     let interface_name = matches.value_of("interface-name").unwrap_or("tun0");
     let interface_ip_str = matches.value_of("interface-ip").unwrap_or("10.0.0.1");
     let forward_ip_str = matches.value_of("forward-ip").unwrap_or("10.0.0.2");
+    let forward_traffic = matches.value_of("forward-traffic").unwrap_or("104.27.171.178");
+    let route_table = matches.value_of("route-table").unwrap_or("rust-simple-tunnel");
 
     let interface_ip = interface_ip_str.parse::<Ipv4Addr>()?;
     let forward_ip = forward_ip_str.parse::<Ipv4Addr>()?;
@@ -110,6 +113,15 @@ async fn main() -> Result<(), CliError>
 
     let receive_tunnel = create_tunnel(&format!("{}", interface_name), &interface_ip);
     let (rtunnel_sink, rtunnel_stream) = receive_tunnel.into_framed().split();
+    info!("Tunnel created with name: {} ip: {}", interface_name, interface_ip_str);
+
+    info!("Forward traffic for destination {} through {}", forward_traffic, interface_name);
+
+    // @TODO use a package or find a way not to drop interface while application creates it
+    Command::new("ip")
+            .args(&["route", "add", forward_traffic, "dev", interface_name, "table", route_table])
+            .output()
+            .expect(&format!("failed to add route to forward traffic to {}", forward_traffic));
 
     info!("Waiting for packages");
 

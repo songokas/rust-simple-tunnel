@@ -12,20 +12,30 @@ args:
     - interface-name:
         short: i
         long: interface-name
-        help: "tun interface name default tun0"
+        help: "tun interface name. default tun0"
         takes_value: true
     - interface-ip:
         short: p
         long: interface-ip
-        help: "tun interface ip default 10.0.0.1"
+        help: "tun interface ip. default 10.0.0.1"
         takes_value: true
-    - forward:
+    - forward-ip:
         short: f
         long: forward-ip
-        help: "ip used to forward traffic further default 10.0.0.2"
+        help: "ip used to forward traffic further. default 10.0.0.2"
+        takes_value: true
+    - forward-traffic:
+        short: t
+        long: forward-traffic
+        help: "forward traffic to destination. default 104.27.171.178"
+        takes_value: true
+    - route-table:
+        short: t
+        long: route-table
+        help: "create routes in this table. default rust-simple-tunnel"
         takes_value: true
     - verbose:
         short: v
         long: verbose
         multiple: true
-        help: sets the level of logging verbosity default info
+        help: sets the level of logging verbosity. default info
