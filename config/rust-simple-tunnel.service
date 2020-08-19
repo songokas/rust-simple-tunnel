@@ -5,7 +5,7 @@ StartLimitIntervalSec=0
 
 [Service]
 Type=simple
-ExecStart=$BIN_PATH $CONFIG_PATH $ROUTE
+ExecStart=$BIN_PATH -c $CONFIG_PATH --forward-traffic $ROUTE
 
 [Install]
 WantedBy=multi-user.target

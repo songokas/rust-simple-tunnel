@@ -10,7 +10,6 @@ check_default=$(awk '$2 == 00000000 { print $1 }' /proc/net/route | head -n1)
 if [[ $check_default ]]; then
     network_interface="$check_default"
 fi
-forward_traffic=""
 nft_table="rust-simple-tunnel"
 route_table_name="rust-simple-tunnel"
 use_nft=""
@@ -24,7 +23,6 @@ printUsage() {
     --tun-ip (tun forward ip default: $tun_ip)
     --tun-forward-ip (tun forward ip default: $tun_forward)
     --network-interface (forward traffic through network interface name default: $network_interface check ip addr)
-    --forward-traffic (forward traffic through tun0 interface example: 216.58.215.99 or default)
     --route-table-name (ip route table name to use. default $route_table_name)
     --clean yes
     "
@@ -71,16 +69,6 @@ esac
 shift
 done
 
-# if [[ ! $key ]]; then
-#     printUsage
-#     exit 1
-# fi
-# if [[ ! $forward_traffic ]]; then
-#     echo -e "--forward-traffic must be provided"
-#     printUsage
-#     exit 1
-# fi
-
 if [[ $use_nft ]]; then
     
     if [[ $(nft list table ip "$nft_table" 2>/dev/null) ]]; then
@@ -103,19 +91,6 @@ else
         iptables -A FORWARD -i "$network_interface" -o "$tun_interface" -d "$tun_forward" -j ACCEPT -m comment --comment "simple rust tunnel"
     fi
 fi
-
-# interface must exists and not be dropped for route to be created
-# if [[ $(ip addr show "$tun_interface" 2> /dev/null) ]]; then
-#     if [[ $clean ]]; then
-#         ip link delete "$tun_interface"
-#     fi
-# else
-#     if [[ ! $clean ]]; then
-#         ip tuntap add mode tun dev "$tun_interface"
-#         ip addr add "$tun_ip" dev "$tun_interface"
-#         ip link set up dev "$tun_interface"
-#     fi
-# fi
 
 if [[ ! $(grep $route_table_name /etc/iproute2/rt_tables ) ]]; then
     echo 100 $route_table_name >> /etc/iproute2/rt_tables 
@@ -140,7 +115,3 @@ fi
 if [[ ! $(ip route show table $route_table_name 2>/dev/null ) ]]; then
     ip route flush table "$route_table_name"
 fi
-
-# if [[ ! "$clean" ]]; then
-#     ip route add "$forward_traffic" dev "$tun_interface" table "$route_table_name"
-# fi

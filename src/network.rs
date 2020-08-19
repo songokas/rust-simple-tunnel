@@ -20,16 +20,16 @@ pub fn create_tunnel(name: &str, ip: &Ipv4Addr) -> Device
     tun::create(&config).expect("Unable to create tunnel. Please use root or sudo")
 }
 
-pub fn create_packet(packet: &ip::v4::Packet<&[u8]>, forward_with_rtunnel_ip: &Ipv4Addr, forward_with_stunnel_ip: &Ipv4Addr) -> ip::v4::Packet<Vec<u8>>
+pub fn create_packet(packet: &ip::v4::Packet<&[u8]>, interface_ip: &Ipv4Addr, forward_ip: &Ipv4Addr) -> ip::v4::Packet<Vec<u8>>
 {
     let mut new_packet = ip::v4::Packet::new(packet.as_ref().to_vec()).unwrap();
     let mut tcp_checksum_change = 0;
-    if &packet.source() == forward_with_rtunnel_ip {
-        new_packet.checked().set_source(forward_with_stunnel_ip.clone()).unwrap();
+    if &packet.source() == interface_ip {
+        new_packet.checked().set_source(forward_ip.clone()).unwrap();
         tcp_checksum_change = -1;
 
-    } else if &packet.destination() == forward_with_stunnel_ip {
-        new_packet.checked().set_destination(forward_with_rtunnel_ip.clone()).unwrap();
+    } else if &packet.destination() == forward_ip {
+        new_packet.checked().set_destination(interface_ip.clone()).unwrap();
         tcp_checksum_change = 1;
     }
 

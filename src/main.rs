@@ -21,7 +21,7 @@ use crate::ruleset::{load_rules, RuleSet, LimitType};
 pub mod network;
 use crate::network::{create_tunnel, create_packet};
 
-fn process_receive(rules: RuleSet, mut dev: Device, forward_with_rtunnel_ip: &Ipv4Addr, forward_with_stunnel_ip: &Ipv4Addr)
+fn process_receive(rules: RuleSet, mut dev: Device, interface_ip: &Ipv4Addr, forward_ip: &Ipv4Addr)
 {
     let mut records = Records::new();
     loop {
@@ -31,7 +31,13 @@ fn process_receive(rules: RuleSet, mut dev: Device, forward_with_rtunnel_ip: &Ip
             Ok(ip::Packet::V4(pkt)) => {
                 debug!("Received: packet id {} src {} dst {}", pkt.id(), pkt.source(), pkt.destination());
 
-                let traffic_ip = if &pkt.source() == forward_with_rtunnel_ip {
+                // packet same interface 
+                if &pkt.source() == interface_ip && &pkt.destination() == forward_ip {
+                    debug!("Ignore packet same interface: {:?}", pkt);
+                    continue;
+                }
+
+                let traffic_ip = if &pkt.source() == interface_ip {
                     pkt.destination()
                 } else {
                     pkt.source()
@@ -41,35 +47,30 @@ fn process_receive(rules: RuleSet, mut dev: Device, forward_with_rtunnel_ip: &Ip
 
                     debug!("Matching rule {:?} ip: {}", rule, traffic_ip);
 
-                    records.entry(traffic_ip)
-                        .and_modify(|record| {
-                            record.data_sent += pkt.length() as u128; 
-                        })
+                    let mut record = records.entry(traffic_ip)
                         .or_insert_with(|| RouteRecord::new(&Local::now(), pkt.length().into() ));
 
-                    if let Some(record) = records.get(&traffic_ip) {
+                    debug!("Matching record {:?}", record);
 
-                        debug!("Matching record {:?}", record);
+                    if can_forward(rule, record) {
 
-                        if can_forward(rule, record) {
-
-                            let new_packet = create_packet(&pkt, &forward_with_rtunnel_ip, &forward_with_stunnel_ip);
-                            debug!(
-                                "Matching forward: packet id {} send src {} dst {} checksum {:X}", 
-                                new_packet.id(), new_packet.source(), new_packet.destination(), new_packet.checksum()
-                            );
-    
-                            dev.write(new_packet.as_ref()).unwrap();
-                        } else {
-                            info!("Packet is not forwarded src {} dst {}", pkt.source(), pkt.destination());
-                            match rule.limit {
-                                LimitType::Duration(seconds) => info!("Duration limit {} seconds reached. Since {}", seconds, record.dt_start),
-                                LimitType::MaxData(bytes) => info!("Data limit {} bytes reached. Current usage: {}", bytes, record.data_sent),
-                            }
+                        let new_packet = create_packet(&pkt, &interface_ip, &forward_ip);
+                        debug!(
+                            "Matching forward: packet id {} send src {} dst {} checksum {:X}", 
+                            new_packet.id(), new_packet.source(), new_packet.destination(), new_packet.checksum()
+                        );
+                        record.data_sent += pkt.length() as u128; 
+                        
+                        dev.write(new_packet.as_ref()).unwrap();
+                    } else {
+                        info!("Packet is not forwarded src {} dst {}", pkt.source(), pkt.destination());
+                        match rule.limit {
+                            LimitType::Duration(seconds) => info!("Duration limit {} seconds reached. Since {}", seconds, record.dt_start),
+                            LimitType::MaxData(bytes) => info!("Data limit {} bytes reached. Current usage: {}", bytes, record.data_sent),
                         }
                     }
                 } else {
-                    let new_packet = create_packet(&pkt, &forward_with_rtunnel_ip, &forward_with_stunnel_ip);
+                    let new_packet = create_packet(&pkt, &interface_ip, &forward_ip);
                     debug!("Not matching forward: packet id {} send src {} dst {}", new_packet.id(), new_packet.source(), new_packet.destination());
 
                     dev.write(new_packet.as_ref()).unwrap();

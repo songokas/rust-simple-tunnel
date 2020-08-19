@@ -26,9 +26,9 @@ cargo build --release
 
 ```
 # apply network rules for tun0
-# forward_traffic: use default or specify network 8.8.8.0/24
-sudo ./setup.sh --tun-name tun0 --tun-ip "10.0.0.1/24" --tun-forward-ip 10.0.0.2 --forward-traffic "default"
-sudo ./target/release/rust-simple-tunnel -c examples/simple.txt -i tun0 --interface-ip 10.0.0.1 --forward-ip 10.0.0.2 --verbose
+sudo ./setup.sh --tun-name tun0 --tun-ip "10.0.0.1/24" --tun-forward-ip 10.0.0.2 "
+# --forward-traffic: use default or specify network 8.8.8.0/24
+sudo ./target/release/rust-simple-tunnel -c examples/simple.txt -i tun0 --interface-ip 10.0.0.1 --forward-ip 10.0.0.2 --forward-traffic "8.8.8.8" --verbose
 ```
 
 or simply
@@ -60,7 +60,7 @@ ping google.com
 sudo bash
 # change according to your needs
 
-CONFIG_PATH="`pwd`/examples/simple.txt" BIN_PATH="`pwd`/target/release/rust-simple-tunnel`" ROUTE="104.27.170.178" envsubst < "services/rust-simple-tunnel.service" > /etc/systemd/system/rust-simple-tunnel.service
+CONFIG_PATH="`pwd`/examples/simple.txt" BIN_PATH="`pwd`/target/release/rust-simple-tunnel" ROUTE="104.27.170.178" envsubst < "config/rust-simple-tunnel.service" > /etc/systemd/system/rust-simple-tunnel.service
 
 systemctl daemon-reload
 
