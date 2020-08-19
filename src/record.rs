@@ -83,10 +83,11 @@ mod tests {
         let rules = vec![
             LimitRule::from_duration(&"127.0.0.1/24".parse::<IpNetwork>().unwrap(), 120),
             LimitRule::from_duration(&"10.0.0.0/8".parse::<IpNetwork>().unwrap(), 120),
-            LimitRule::from_duration(&"192.168.0.0/16".parse::<IpNetwork>().unwrap(), 120),
+            LimitRule::from_duration(&"10.168.0.0/16".parse::<IpNetwork>().unwrap(), 120),
         ];
         assert_eq!(&rules[0], get_matching_rule(&rules, &IpAddr::V4(Ipv4Addr::new(127, 0, 0, 2))).unwrap());
-        assert_eq!(&rules[2], get_matching_rule(&rules, &IpAddr::V4(Ipv4Addr::new(192, 168, 1, 2))).unwrap());
+        assert_eq!(&rules[2], get_matching_rule(&rules, &IpAddr::V4(Ipv4Addr::new(10, 168, 1, 2))).unwrap());
+        assert_eq!(&rules[1], get_matching_rule(&rules, &IpAddr::V4(Ipv4Addr::new(10, 169, 1, 2))).unwrap());
         assert_eq!(&rules[1], get_matching_rule(&rules, &IpAddr::V4(Ipv4Addr::new(10, 1, 0, 2))).unwrap());
         assert_eq!(&rules[1], get_matching_rule(&rules, &IpAddr::V4(Ipv4Addr::new(10, 0, 0, 2))).unwrap());
         assert!(get_matching_rule(&rules, &IpAddr::V4(Ipv4Addr::new(11, 0, 1, 1))).is_none());

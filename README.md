@@ -39,6 +39,7 @@ sudo ./run.sh examples/simple.txt
 ```
 
 curl --interface tun0 google.com
+ping -I tun0 google.com
 
 or
 
@@ -49,10 +50,7 @@ sudo ./run.sh examples/simple.txt 216.58.215.110
 ```
 
 curl google.com
-
-# Run 
-```
-```
+ping google.com
 
 # Make it persistant
 
@@ -85,4 +83,5 @@ Format for duration 1s 2m 3h [more info](https://docs.rs/humantime/2.0.1/humanti
 
 # Todo
 
-* issues with https traffic
+* issues with https traffic tshark
+* slow downloads

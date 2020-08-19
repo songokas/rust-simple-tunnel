@@ -34,19 +34,25 @@ async fn process_receive(rules: RuleSet, mut reader: StreamReader, mut writer: S
             Ok(raw_packet) => { 
                 match ip::Packet::new(raw_packet.get_bytes()) {
                     Ok(ip::Packet::V4(pkt)) => {
-                        debug!("Rtunnel received: packet id {} src {} dst {}", pkt.id(), pkt.source(), pkt.destination());
+                        debug!("Received: packet id {} src {} dst {}", pkt.id(), pkt.source(), pkt.destination());
 
-                        if let Some(rule) = get_matching_rule(&rules, &IpAddr::V4(pkt.destination())) {
+                        let traffic_ip = if &pkt.source() == forward_with_rtunnel_ip {
+                            pkt.destination()
+                        } else {
+                            pkt.source()
+                        };
 
-                            debug!("Matching rule {:?}", rule);
+                        if let Some(rule) = get_matching_rule(&rules, &IpAddr::V4(traffic_ip)) {
 
-                            records.entry(pkt.destination())
+                            debug!("Matching rule {:?} ip: {}", rule, traffic_ip);
+
+                            records.entry(traffic_ip)
                                 .and_modify(|record| {
                                     record.data_sent += pkt.length() as u128; 
                                 })
                                 .or_insert_with(|| RouteRecord::new(&Local::now(), pkt.length().into() ));
 
-                            if let Some(record) = records.get(&pkt.destination()) {
+                            if let Some(record) = records.get(&traffic_ip) {
 
                                 debug!("Matching record {:?}", record);
 
@@ -54,7 +60,7 @@ async fn process_receive(rules: RuleSet, mut reader: StreamReader, mut writer: S
 
                                     let new_packet = create_packet(&pkt, &forward_with_rtunnel_ip, &forward_with_stunnel_ip);
                                     debug!(
-                                        "Rtunnel forward: packet id {} send src {} dst {} checksum {:X}", 
+                                        "Matching forward: packet id {} send src {} dst {} checksum {:X}", 
                                         new_packet.id(), new_packet.source(), new_packet.destination(), new_packet.checksum()
                                     );
            
@@ -63,7 +69,7 @@ async fn process_receive(rules: RuleSet, mut reader: StreamReader, mut writer: S
                                     ).await
                                     .unwrap_or_else(|e| info!("invalid packet {:?}", e) );
                                 } else {
-                                    info!("Packet is not forwarded to {}", pkt.destination());
+                                    info!("Packet is not forwarded src {} dst {}", pkt.source(), pkt.destination());
                                     match rule.limit {
                                         LimitType::Duration(seconds) => info!("Duration limit {} seconds reached. Since {}", seconds, record.dt_start),
                                         LimitType::MaxData(bytes) => info!("Data limit {} bytes reached. Current usage: {}", bytes, record.data_sent),
@@ -72,7 +78,7 @@ async fn process_receive(rules: RuleSet, mut reader: StreamReader, mut writer: S
                             }
                         } else {
                             let new_packet = create_packet(&pkt, &forward_with_rtunnel_ip, &forward_with_stunnel_ip);
-                            debug!("Rtunnel forward: packet id {} send src {} dst {}", new_packet.id(), new_packet.source(), new_packet.destination());
+                            debug!("Not matching forward: packet id {} send src {} dst {}", new_packet.id(), new_packet.source(), new_packet.destination());
    
                             writer.send(
                                 TunPacket::new(new_packet.as_ref().to_vec())
@@ -85,7 +91,7 @@ async fn process_receive(rules: RuleSet, mut reader: StreamReader, mut writer: S
                     _ => debug!("not an ipv4 packet received. ignoring"),
                 }
             },
-            Err(err) => warn!("Error: {:?}", err),
+            Err(err) => panic!("Error: {:?}", err),
         }
     }
 }

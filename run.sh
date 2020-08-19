@@ -18,7 +18,7 @@ trap "$CURRENT_DIR/setup.sh --clean yes" EXIT
 $CURRENT_DIR/setup.sh
 
 if [[ $forward_traffic ]]; then
-    $CURRENT_DIR/target/release/rust-simple-tunnel -c "$config" --forward-traffic "$forward_traffic" --verbose
+    $CURRENT_DIR/target/release/rust-simple-tunnel -c "$config" --forward-traffic "$forward_traffic"
 else
-    $CURRENT_DIR/target/release/rust-simple-tunnel -c "$config" --verbose
+    $CURRENT_DIR/target/release/rust-simple-tunnel -c "$config"
 fi
