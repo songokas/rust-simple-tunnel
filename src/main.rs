@@ -31,59 +31,60 @@ async fn process_receive(rules: RuleSet, mut reader: StreamReader, mut writer: S
 
     while let Some(packet) = reader.next().await {
         match packet {
-            Ok(raw_packet) => { match ip::Packet::new(raw_packet.get_bytes()) {
-                Ok(ip::Packet::V4(pkt)) => {
-                    debug!("Rtunnel received: packet id {} src {} dst {}", pkt.id(), pkt.source(), pkt.destination());
+            Ok(raw_packet) => { 
+                match ip::Packet::new(raw_packet.get_bytes()) {
+                    Ok(ip::Packet::V4(pkt)) => {
+                        debug!("Rtunnel received: packet id {} src {} dst {}", pkt.id(), pkt.source(), pkt.destination());
 
-                    if let Some(rule) = get_matching_rule(&rules, &IpAddr::V4(pkt.destination())) {
+                        if let Some(rule) = get_matching_rule(&rules, &IpAddr::V4(pkt.destination())) {
 
-                        debug!("Matching rule {:?}", rule);
+                            debug!("Matching rule {:?}", rule);
 
-                        records.entry(pkt.destination())
-                            .and_modify(|record| {
-                                record.data_sent += pkt.length() as u128; 
-                            })
-                            .or_insert_with(|| RouteRecord::new(&Local::now(), pkt.length().into() ));
+                            records.entry(pkt.destination())
+                                .and_modify(|record| {
+                                    record.data_sent += pkt.length() as u128; 
+                                })
+                                .or_insert_with(|| RouteRecord::new(&Local::now(), pkt.length().into() ));
 
-                        if let Some(record) = records.get(&pkt.destination()) {
+                            if let Some(record) = records.get(&pkt.destination()) {
 
-                            debug!("Matching record {:?}", record);
+                                debug!("Matching record {:?}", record);
 
-                            if can_forward(rule, record) {
+                                if can_forward(rule, record) {
 
-                                let new_packet = create_packet(&pkt, &forward_with_rtunnel_ip, &forward_with_stunnel_ip);
-                                debug!(
-                                    "Rtunnel forward: packet id {} send src {} dst {} checksum {:X}", 
-                                    new_packet.id(), new_packet.source(), new_packet.destination(), new_packet.checksum()
-                                );
+                                    let new_packet = create_packet(&pkt, &forward_with_rtunnel_ip, &forward_with_stunnel_ip);
+                                    debug!(
+                                        "Rtunnel forward: packet id {} send src {} dst {} checksum {:X}", 
+                                        new_packet.id(), new_packet.source(), new_packet.destination(), new_packet.checksum()
+                                    );
            
-                                writer.send(
-                                    TunPacket::new(new_packet.as_ref().to_vec())
-                                ).await
-                                .unwrap_or_else(|e| info!("invalid packet {:?}", e) );
-
-                            } else {
-                                info!("Packet is not forwarded to {}", pkt.destination());
-                                match rule.limit {
-                                    LimitType::Duration(seconds) => info!("Duration limit {} seconds reached. Since {}", seconds, record.dt_start),
-                                    LimitType::MaxData(bytes) => info!("Data limit {} bytes reached. Current usage: {}", bytes, record.data_sent),
+                                    writer.send(
+                                        TunPacket::new(new_packet.as_ref().to_vec())
+                                    ).await
+                                    .unwrap_or_else(|e| info!("invalid packet {:?}", e) );
+                                } else {
+                                    info!("Packet is not forwarded to {}", pkt.destination());
+                                    match rule.limit {
+                                        LimitType::Duration(seconds) => info!("Duration limit {} seconds reached. Since {}", seconds, record.dt_start),
+                                        LimitType::MaxData(bytes) => info!("Data limit {} bytes reached. Current usage: {}", bytes, record.data_sent),
+                                    }
                                 }
                             }
-                        }
-                    } else {
-                        let new_packet = create_packet(&pkt, &forward_with_rtunnel_ip, &forward_with_stunnel_ip);
-                        debug!("Rtunnel forward: packet id {} send src {} dst {}", new_packet.id(), new_packet.source(), new_packet.destination());
+                        } else {
+                            let new_packet = create_packet(&pkt, &forward_with_rtunnel_ip, &forward_with_stunnel_ip);
+                            debug!("Rtunnel forward: packet id {} send src {} dst {}", new_packet.id(), new_packet.source(), new_packet.destination());
    
-                        writer.send(
-                            TunPacket::new(new_packet.as_ref().to_vec())
-                        ).await
-                        .unwrap_or_else(|e| info!("invalid packet {:?}", e) );
-                    }
+                            writer.send(
+                                TunPacket::new(new_packet.as_ref().to_vec())
+                            ).await
+                            .unwrap_or_else(|e| info!("invalid packet {:?}", e) );
+                        }
                     
-                },
-                Err(err) => warn!("Received an invalid packet: {:?}", err),
-                _ => {}
-            }},
+                    },
+                    Err(err) => warn!("Received an invalid packet: {:?}", err),
+                    _ => debug!("not an ipv4 packet received. ignoring"),
+                }
+            },
             Err(err) => warn!("Error: {:?}", err),
         }
     }
@@ -99,7 +100,7 @@ async fn main() -> Result<(), CliError>
     let interface_name = matches.value_of("interface-name").unwrap_or("tun0");
     let interface_ip_str = matches.value_of("interface-ip").unwrap_or("10.0.0.1");
     let forward_ip_str = matches.value_of("forward-ip").unwrap_or("10.0.0.2");
-    let forward_traffic = matches.value_of("forward-traffic").unwrap_or("104.27.171.178");
+    let forward_traffic = matches.value_of("forward-traffic").unwrap_or("");
     let route_table = matches.value_of("route-table").unwrap_or("rust-simple-tunnel");
 
     let interface_ip = interface_ip_str.parse::<Ipv4Addr>()?;
@@ -115,14 +116,17 @@ async fn main() -> Result<(), CliError>
     let (rtunnel_sink, rtunnel_stream) = receive_tunnel.into_framed().split();
     info!("Tunnel created with name: {} ip: {}", interface_name, interface_ip_str);
 
-    info!("Forward traffic for destination {} through {}", forward_traffic, interface_name);
+    if forward_traffic.is_empty() {
+        info!("forward traffic option is not provided. please forward traffic yourself as needed. e.g. run: ip route add 104.27.171.178 table {}", route_table);
+    } else {
+        info!("Forward traffic for destination {} through {}", forward_traffic, interface_name);
 
-    // @TODO use a package or find a way not to drop interface while application creates it
-    Command::new("ip")
+        // @TODO use a package or find a way not to drop interface while application creates it
+        Command::new("ip")
             .args(&["route", "add", forward_traffic, "dev", interface_name, "table", route_table])
             .output()
             .expect(&format!("failed to add route to forward traffic to {}", forward_traffic));
-
+    }
     info!("Waiting for packages");
 
     join!(

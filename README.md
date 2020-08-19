@@ -34,7 +34,24 @@ sudo ./target/release/rust-simple-tunnel -c examples/simple.txt -i tun0 --interf
 or simply
 
 ```
-sudo ./run.sh
+# first parameter - config to use
+sudo ./run.sh examples/simple.txt
+```
+
+curl --interface tun0 google.com
+
+or
+
+
+```
+# second parameter - destination to forward. use default to forward all traffic
+sudo ./run.sh examples/simple.txt 216.58.215.110
+```
+
+curl google.com
+
+# Run 
+```
 ```
 
 # Make it persistant

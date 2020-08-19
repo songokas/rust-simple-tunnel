@@ -2,17 +2,23 @@
 
 set -e
 
-forward_route="104.27.170.178"
-config="examples/simple.txt"
+CURRENT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
+
+forward_traffic=""
+config="$CURRENT_DIR/examples/simple.txt"
 if [[ $1 ]]; then
     confi="$1"
 fi
 if [[ $2 ]]; then
-    forward_route="$2"
+    forward_traffic="$2"
 fi
 
-trap './setup.sh --forward-traffic '"$forward_route"' --clean yes' EXIT
+trap "$CURRENT_DIR/setup.sh --clean yes" EXIT
 
-./setup.sh --forward-traffic "$forward_route"
+$CURRENT_DIR/setup.sh
 
-./target/release/rust-simple-tunnel -c "$config" --verbose
+if [[ $forward_traffic ]]; then
+    $CURRENT_DIR/target/release/rust-simple-tunnel -c "$config" --forward-traffic "$forward_traffic" --verbose
+else
+    $CURRENT_DIR/target/release/rust-simple-tunnel -c "$config" --verbose
+fi

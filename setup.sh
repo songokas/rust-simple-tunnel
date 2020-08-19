@@ -71,15 +71,15 @@ esac
 shift
 done
 
-if [[ ! $key ]]; then
-    printUsage
-    exit 1
-fi
-if [[ ! $forward_traffic ]]; then
-    echo -e "--forward-traffic must be provided"
-    printUsage
-    exit 1
-fi
+# if [[ ! $key ]]; then
+#     printUsage
+#     exit 1
+# fi
+# if [[ ! $forward_traffic ]]; then
+#     echo -e "--forward-traffic must be provided"
+#     printUsage
+#     exit 1
+# fi
 
 if [[ $use_nft ]]; then
     
@@ -94,13 +94,13 @@ if [[ $use_nft ]]; then
     fi
 else
     if [[ $clean ]]; then
-        iptables -t nat -D POSTROUTING -o $network_interface -s $tun_forward -j MASQUERADE -m comment --comment "simple rust tunnel"
-        iptables -D FORWARD -i $tun_interface -o $network_interface -s $tun_forward -j ACCEPT -m comment --comment "simple rust tunnel"
-        iptables -D FORWARD -i $network_interface -o $tun_interface -d $tun_forward -j ACCEPT -m comment --comment "simple rust tunnel"
+        iptables -t nat -D POSTROUTING -o "$network_interface" -s "$tun_forward" -j MASQUERADE -m comment --comment "simple rust tunnel"
+        iptables -D FORWARD -i "$tun_interface" -o "$network_interface" -s "$tun_forward" -j ACCEPT -m comment --comment "simple rust tunnel"
+        iptables -D FORWARD -i "$network_interface" -o $tun_interface -d "$tun_forward" -j ACCEPT -m comment --comment "simple rust tunnel"
     else
-        iptables -t nat -A POSTROUTING -o $network_interface -s $tun_forward -j MASQUERADE -m comment --comment "simple rust tunnel"
-        iptables -A FORWARD -i $tun_interface -o $network_interface -s $tun_forward -j ACCEPT -m comment --comment "simple rust tunnel"
-        iptables -A FORWARD -i $network_interface -o $tun_interface -d $tun_forward -j ACCEPT -m comment --comment "simple rust tunnel"
+        iptables -t nat -A POSTROUTING -o "$network_interface" -s "$tun_forward" -j MASQUERADE -m comment --comment "simple rust tunnel"
+        iptables -A FORWARD -i "$tun_interface" -o "$network_interface" -s "$tun_forward" -j ACCEPT -m comment --comment "simple rust tunnel"
+        iptables -A FORWARD -i "$network_interface" -o "$tun_interface" -d "$tun_forward" -j ACCEPT -m comment --comment "simple rust tunnel"
     fi
 fi
 
