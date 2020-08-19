@@ -8,12 +8,9 @@ edition = "2018"
 clap = {version = "~2.27.0", features = ["yaml"]}
 log = "~0.4.0"
 env_logger = "~0.7.0"
-tokio      = { version = "0.2", features = ["macros"] }
-tokio-util = { version = "0.3", features = ["codec"] }
 chrono     = "0.4"
 ipnetwork   = "~0.17.0"
 byte-unit = "~4.0.9"
 humantime = "~2.0.1"
-tun = { version = "0.5", features = ["async"] }
+tun = { version = "0.5" }
 packet     = "0.1"
-futures    = "~0.3.1"

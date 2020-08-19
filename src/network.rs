@@ -1,11 +1,12 @@
 use packet::{ip, tcp};
 use packet::ip::{Protocol};
 use packet::{PacketMut};
-use tun::{configure, DeviceAsync};
+use tun::platform::Device;
+use tun::{configure};
 use std::net::{Ipv4Addr};
 
 
-pub fn create_tunnel(name: &str, ip: &Ipv4Addr) -> DeviceAsync
+pub fn create_tunnel(name: &str, ip: &Ipv4Addr) -> Device
 {
     let mut config = configure();
 
@@ -16,11 +17,7 @@ pub fn create_tunnel(name: &str, ip: &Ipv4Addr) -> DeviceAsync
         .netmask((255, 255, 255, 0))
         .up();
 
-    #[cfg(target_os = "linux")]
-    config.platform(|config| {
-        config.packet_information(true);
-    });
-    tun::create_as_async(&config).expect("Unable to create tunnel. Please use root or sudo")
+    tun::create(&config).expect("Unable to create tunnel. Please use root or sudo")
 }
 
 pub fn create_packet(packet: &ip::v4::Packet<&[u8]>, forward_with_rtunnel_ip: &Ipv4Addr, forward_with_stunnel_ip: &Ipv4Addr) -> ip::v4::Packet<Vec<u8>>
