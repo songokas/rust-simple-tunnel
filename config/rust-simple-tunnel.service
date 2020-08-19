@@ -5,7 +5,7 @@ StartLimitIntervalSec=0
 
 [Service]
 Type=simple
-ExecStart=$BIN_PATH $CONFIG_PATH default
+ExecStart=$BIN_PATH $CONFIG_PATH $ROUTE
 
 [Install]
 WantedBy=multi-user.target

@@ -2,6 +2,8 @@
 
 simple rust application to filter traffic through tun0 interface
 
+linux only
+
 # Dependencies
 
 * cargo - to compile application
@@ -15,24 +17,24 @@ simple rust application to filter traffic through tun0 interface
 ### Build application
 
 ```
-git clone https://
-cd rust_simple_tunnel
+git clone https://github.com/songokas/rust-simple-tunnel.git
+cd rust-simple-tunnel
 cargo build --release
 ```
 
 ### Run application
 
 ```
-sudo ./target/release/rust-simple-tunnel -c examples/simple.txt -i tun0 --interface-ip 10.0.0.1 --forward-ip 10.0.0.2 --verbose
-# apply network rules for tun0 
+# apply network rules for tun0
 # forward_traffic: use default or specify network 8.8.8.0/24
-sudo setup.sh --tun-name tun0 --tun-forward-ip 10.0.0.2 --forward-traffic default 
+sudo ./setup.sh --tun-name tun0 --tun-ip "10.0.0.1/24" --tun-forward-ip 10.0.0.2 --forward-traffic "default"
+sudo ./target/release/rust-simple-tunnel -c examples/simple.txt -i tun0 --interface-ip 10.0.0.1 --forward-ip 10.0.0.2 --verbose
 ```
 
 or simply
 
 ```
-sudo run.sh
+sudo ./run.sh
 ```
 
 # Make it persistant
@@ -40,10 +42,10 @@ sudo run.sh
 
 ```
 # become root
-sudo -i
+sudo bash
 # change according to your needs
 
-CONFIG_PATH="`pwd`/examples/simple.txt" BIN_PATH="`pwd`/target/release/rust-simple-tunnel`" envsubst < "services/rust-simple-tunnel.service" > /etc/systemd/system/rust-simple-tunnel.service
+CONFIG_PATH="`pwd`/examples/simple.txt" BIN_PATH="`pwd`/target/release/rust-simple-tunnel`" ROUTE="104.27.170.178" envsubst < "services/rust-simple-tunnel.service" > /etc/systemd/system/rust-simple-tunnel.service
 
 systemctl daemon-reload
 

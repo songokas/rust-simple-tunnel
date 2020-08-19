@@ -1,8 +1,8 @@
 #!/bin/bash
 
-set -e -x
+set -e
 
-forward_route="8.8.8.8"
+forward_route="104.27.170.178"
 config="examples/simple.txt"
 if [[ $1 ]]; then
     confi="$1"
