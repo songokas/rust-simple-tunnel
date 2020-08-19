@@ -5,8 +5,8 @@ simple rust application to filter traffic through tun0 interface
 # Dependencies
 
 * cargo - to compile application
-* nft command - for traffic forwarding and masquarade
-* ip command - for traffic rules
+* nft or iptables - for traffic forwarding and masquarade
+* ip - for traffic rules
 * grep - in setup.sh for rule manipulation
 * awk - in setup.sh for rule manipulation
 
