@@ -134,7 +134,7 @@ mod tests {
         let rule = LimitRule::from_duration(&"0.0.0.0/0".parse::<IpNetwork>().unwrap(), 100);
         assert!(rule.contains(&IpAddr::V4(Ipv4Addr::new(127, 0, 0, 2))));
         let rule = LimitRule::from_duration(&"192.168.0.1/24".parse::<IpNetwork>().unwrap(), 100);
-        assert!(rule.contains(&IpAddr::V4(Ipv4Addr::new(192, 0, 0, 101))));
+        assert!(rule.contains(&IpAddr::V4(Ipv4Addr::new(192, 168, 0, 101))));
         assert!(!rule.contains(&IpAddr::V4(Ipv4Addr::new(192, 0, 1, 101))));
     }
 

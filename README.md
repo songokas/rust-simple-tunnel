@@ -81,7 +81,3 @@ Format for bytes 1kb, 2mb, 3gb [more info](https://docs.rs/byte-unit/4.0.9/byte_
 
 Format for duration 1s 2m 3h [more info](https://docs.rs/humantime/2.0.1/humantime/struct.Duration.html)
 
-# Todo
-
-* issues with https traffic tshark
-* slow downloads
