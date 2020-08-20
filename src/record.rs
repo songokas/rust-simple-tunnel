@@ -3,7 +3,7 @@ use std::net::{IpAddr, Ipv4Addr};
 use std::collections::HashMap;
 use crate::ruleset::{RuleSet, LimitType, LimitRule};
 
-pub type Records = HashMap<Ipv4Addr, RouteRecord>;
+pub type Records = HashMap<(Ipv4Addr, u16), RouteRecord>;
 
 #[derive(Debug)]
 pub struct RouteRecord

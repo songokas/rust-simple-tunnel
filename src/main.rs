@@ -19,11 +19,12 @@ pub mod ruleset;
 use crate::ruleset::{load_rules, RuleSet, LimitType};
 #[path = "network.rs"]
 pub mod network;
-use crate::network::{create_tunnel, create_packet};
+use crate::network::{create_tunnel, create_packet, get_traffic_ip};
 
 fn process_receive(rules: RuleSet, mut dev: Device, interface_ip: &Ipv4Addr, forward_ip: &Ipv4Addr)
 {
     let mut records = Records::new();
+    let mut counter: u64 = 0;
     loop {
         let mut buf = [0; 4096];
         let amount = dev.read(&mut buf).unwrap();
@@ -31,24 +32,20 @@ fn process_receive(rules: RuleSet, mut dev: Device, interface_ip: &Ipv4Addr, for
             Ok(ip::Packet::V4(pkt)) => {
                 debug!("Received: packet id {} src {} dst {}", pkt.id(), pkt.source(), pkt.destination());
 
-                // packet same interface 
+                // ignore packet same interface 
                 if &pkt.source() == interface_ip && &pkt.destination() == forward_ip {
                     debug!("Ignore packet same interface: {:?}", pkt);
                     continue;
                 }
 
-                let traffic_ip = if &pkt.source() == interface_ip {
-                    pkt.destination()
-                } else {
-                    pkt.source()
-                };
+                let (traffic_ip, local_port) = get_traffic_ip(&pkt, interface_ip);
 
                 if let Some(rule) = get_matching_rule(&rules, &IpAddr::V4(traffic_ip)) {
 
-                    debug!("Matching rule {:?} ip: {}", rule, traffic_ip);
+                    debug!("Matching rule {:?} ip: {} local port: {}", rule, traffic_ip, local_port);
 
-                    let mut record = records.entry(traffic_ip)
-                        .or_insert_with(|| RouteRecord::new(&Local::now(), pkt.length().into() ));
+                    let mut record = records.entry((traffic_ip, local_port))
+                        .or_insert_with(|| RouteRecord::new(&Local::now(), pkt.length().into()));
 
                     debug!("Matching record {:?}", record);
 
@@ -79,6 +76,13 @@ fn process_receive(rules: RuleSet, mut dev: Device, interface_ip: &Ipv4Addr, for
             },
             Err(err) => warn!("Received an invalid packet: {:?}", err),
             _ => debug!("not an ipv4 packet received. ignoring"),
+        }
+        counter += 1;
+        // cleanup
+        if counter % 100 == 0 {
+            let keep_time = Local::now() - chrono::Duration::minutes(2);
+            records.retain(|_, rule| rule.dt_start > keep_time );
+            debug!("Record count: {}", records.len());
         }
     }
 }

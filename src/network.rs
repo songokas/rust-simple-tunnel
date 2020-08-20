@@ -1,10 +1,29 @@
 use packet::{ip, tcp};
 use packet::ip::{Protocol};
-use packet::{PacketMut};
+use packet::{Packet, PacketMut};
 use tun::platform::Device;
 use tun::{configure};
 use std::net::{Ipv4Addr};
 
+pub fn get_traffic_ip(pkt: &ip::v4::Packet<&[u8]>, interface_ip: &Ipv4Addr) -> (Ipv4Addr, u16)
+{
+    let mut local_port: u16 = 0;
+    if pkt.protocol() == Protocol::Tcp {
+        let tcp = tcp::Packet::new(pkt.payload()).unwrap();
+        local_port = if &pkt.source() == interface_ip {
+            tcp.source()
+        } else {
+            tcp.destination()
+        };
+    }
+
+    let traffic_ip = if &pkt.source() == interface_ip {
+        pkt.destination()
+    } else {
+        pkt.source()
+    };
+    (traffic_ip, local_port)
+}
 
 pub fn create_tunnel(name: &str, ip: &Ipv4Addr) -> Device
 {
