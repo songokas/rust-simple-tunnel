@@ -8,16 +8,37 @@ pub type Records = HashMap<(Ipv4Addr, u16), RouteRecord>;
 #[derive(Debug)]
 pub struct RouteRecord
 {
-    //@TODO private
-    pub dt_start: DateTime<Local>,
-    pub data_sent: u128,
+    dt_start: DateTime<Local>,
+    dtm: DateTime<Local>,
+    data_sent: u128,
 }
 
 impl RouteRecord
 {
     pub fn new (dt: &DateTime<Local>, size: u128) -> Self
     {
-        RouteRecord { dt_start: dt.clone(), data_sent: size }
+        RouteRecord { dt_start: dt.clone(), data_sent: size, dtm: Local::now() }
+    }
+
+    pub fn update_bytes(&mut self, bytes: u128)
+    {
+        self.data_sent += bytes;
+        self.dtm = Local::now();
+    }
+
+    pub fn is_valid(&self, expiration_time: &DateTime<Local>) -> bool
+    {
+        &self.dtm > expiration_time
+    }
+
+    pub fn data_sent(&self) -> &u128
+    {
+        &self.data_sent
+    }
+
+    pub fn dt_start(&self) -> &DateTime<Local>
+    {
+        &self.dt_start
     }
 }
 

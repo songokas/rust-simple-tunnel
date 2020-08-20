@@ -44,7 +44,7 @@ fn process_receive(rules: RuleSet, mut dev: Device, interface_ip: &Ipv4Addr, for
 
                     debug!("Matching rule {:?} ip: {} local port: {}", rule, traffic_ip, local_port);
 
-                    let mut record = records.entry((traffic_ip, local_port))
+                    let record = records.entry((traffic_ip, local_port))
                         .or_insert_with(|| RouteRecord::new(&Local::now(), pkt.length().into()));
 
                     debug!("Matching record {:?}", record);
@@ -56,14 +56,14 @@ fn process_receive(rules: RuleSet, mut dev: Device, interface_ip: &Ipv4Addr, for
                             "Matching forward: packet id {} send src {} dst {} checksum {:X}", 
                             new_packet.id(), new_packet.source(), new_packet.destination(), new_packet.checksum()
                         );
-                        record.data_sent += pkt.length() as u128; 
+                        record.update_bytes(pkt.length() as u128);
                         
                         dev.write(new_packet.as_ref()).unwrap();
                     } else {
                         info!("Packet is not forwarded src {} dst {}", pkt.source(), pkt.destination());
                         match rule.limit {
-                            LimitType::Duration(seconds) => info!("Duration limit {} seconds reached. Since {}", seconds, record.dt_start),
-                            LimitType::MaxData(bytes) => info!("Data limit {} bytes reached. Current usage: {}", bytes, record.data_sent),
+                            LimitType::Duration(seconds) => info!("Duration limit {} seconds reached. Since {}", seconds, record.dt_start()),
+                            LimitType::MaxData(bytes) => info!("Data limit {} bytes reached. Current usage: {}", bytes, record.data_sent()),
                         }
                     }
                 } else {
@@ -80,8 +80,8 @@ fn process_receive(rules: RuleSet, mut dev: Device, interface_ip: &Ipv4Addr, for
         counter += 1;
         // cleanup
         if counter % 100 == 0 {
-            let keep_time = Local::now() - chrono::Duration::minutes(2);
-            records.retain(|_, rule| rule.dt_start > keep_time );
+            let expiration_time = Local::now() - chrono::Duration::minutes(2);
+            records.retain(|_, rule| rule.is_valid(&expiration_time) );
             debug!("Record count: {}", records.len());
         }
     }

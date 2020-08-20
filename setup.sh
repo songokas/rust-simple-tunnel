@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -e
+set -e -x
 
 tun_interface="tun0"
 tun_ip="10.0.0.1"
