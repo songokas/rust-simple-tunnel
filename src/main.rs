@@ -1,6 +1,6 @@
 use packet::{ip};
 use tun::platform::Device;
-use chrono::{Local};
+use chrono::{Local, Duration};
 use std::net::{IpAddr, Ipv4Addr};
 use clap::{App, load_yaml};
 use env_logger::Env;
@@ -21,13 +21,16 @@ use crate::ruleset::{load_rules, RuleSet, LimitType};
 pub mod network;
 use crate::network::{create_tunnel, create_packet, get_traffic_ip};
 
+const CLEAN_IN_MINUTES: i64 = 1;
+const EXPIRE_IN_MINUTES: i64 = 10;
+
 fn process_receive(rules: RuleSet, mut dev: Device, interface_ip: &Ipv4Addr, forward_ip: &Ipv4Addr)
 {
     let mut records = Records::new();
-    let mut counter: u64 = 0;
+    let mut next_clean = Local::now() + Duration::minutes(CLEAN_IN_MINUTES);
     loop {
         let mut buf = [0; 4096];
-        let amount = dev.read(&mut buf).unwrap();
+        let amount = dev.read(&mut buf).expect("failed to read from device");
         match ip::Packet::new(&buf[..amount]) {
             Ok(ip::Packet::V4(pkt)) => {
                 debug!("Received: packet id {} src {} dst {}", pkt.id(), pkt.source(), pkt.destination());
@@ -38,13 +41,19 @@ fn process_receive(rules: RuleSet, mut dev: Device, interface_ip: &Ipv4Addr, for
                     continue;
                 }
 
-                let (traffic_ip, local_port) = get_traffic_ip(&pkt, interface_ip);
+                let (traffic_ip, mut local_port) = get_traffic_ip(&pkt, interface_ip);
 
                 if let Some(rule) = get_matching_rule(&rules, &IpAddr::V4(traffic_ip)) {
+
+                    // for byte based rule local port is ignored
+                    if let LimitType::MaxData(_v) = rule.limit {
+                        local_port = 0;
+                    }
 
                     debug!("Matching rule {:?} ip: {} local port: {}", rule, traffic_ip, local_port);
 
                     let record = records.entry((traffic_ip, local_port))
+                        .and_modify(|record| record.update_bytes(pkt.length() as u128))
                         .or_insert_with(|| RouteRecord::new(&Local::now(), pkt.length().into()));
 
                     debug!("Matching record {:?}", record);
@@ -56,9 +65,8 @@ fn process_receive(rules: RuleSet, mut dev: Device, interface_ip: &Ipv4Addr, for
                             "Matching forward: packet id {} send src {} dst {} checksum {:X}", 
                             new_packet.id(), new_packet.source(), new_packet.destination(), new_packet.checksum()
                         );
-                        record.update_bytes(pkt.length() as u128);
                         
-                        dev.write(new_packet.as_ref()).unwrap();
+                        dev.write(new_packet.as_ref()).expect("Failed to write to device");
                     } else {
                         info!("Packet is not forwarded src {} dst {}", pkt.source(), pkt.destination());
                         match rule.limit {
@@ -70,19 +78,18 @@ fn process_receive(rules: RuleSet, mut dev: Device, interface_ip: &Ipv4Addr, for
                     let new_packet = create_packet(&pkt, &interface_ip, &forward_ip);
                     debug!("Not matching forward: packet id {} send src {} dst {}", new_packet.id(), new_packet.source(), new_packet.destination());
 
-                    dev.write(new_packet.as_ref()).unwrap();
+                    dev.write(new_packet.as_ref()).expect("Failed to write to device");
                 }
             
             },
             Err(err) => warn!("Received an invalid packet: {:?}", err),
             _ => debug!("not an ipv4 packet received. ignoring"),
         }
-        counter += 1;
-        // cleanup
-        if counter % 100 == 0 {
-            let expiration_time = Local::now() - chrono::Duration::minutes(2);
+        if Local::now() > next_clean {
+            let expiration_time = Local::now() - Duration::minutes(EXPIRE_IN_MINUTES);
             records.retain(|_, rule| rule.is_valid(&expiration_time) );
-            debug!("Record count: {}", records.len());
+            debug!("Cleaning records. Record count: {}", records.len());
+            next_clean = Local::now() + Duration::minutes(CLEAN_IN_MINUTES);
         }
     }
 }

@@ -28,15 +28,18 @@ printUsage() {
     "
 }
 
+if [[ $1 == "--help" ]]; then
+    printUsage
+    exit 0
+fi
+
 while [[ $# -gt 1 ]]
 do
 key="$1"
-
 case $key in
     --tun-name)
     tun_interface="$2"
     shift
-    
     ;;
     --tun-ip)
     tun_ip="$2"
@@ -50,10 +53,6 @@ case $key in
     network_interface="$2"
     shift
     ;;
-    --forward-traffic)
-    forward_traffic="$2"
-    shift
-    ;;
     --clean)
     clean="$2"
     shift
@@ -64,6 +63,7 @@ case $key in
     ;;
     *)
     printUsage
+    exit 1
     ;;
 esac
 shift

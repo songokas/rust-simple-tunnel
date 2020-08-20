@@ -27,11 +27,18 @@ cargo build --release
 ```
 # apply network rules for tun0
 sudo ./setup.sh --tun-name tun0 --tun-ip "10.0.0.1/24" --tun-forward-ip 10.0.0.2 "
-# --forward-traffic: use default or specify network 8.8.8.0/24
+# --forward-traffic: use default or specify network 8.8.8.0/24 or do not provide it
 sudo ./target/release/rust-simple-tunnel -c examples/simple.txt -i tun0 --interface-ip 10.0.0.1 --forward-ip 10.0.0.2 --forward-traffic "8.8.8.8" --verbose
 ```
 
-or simply
+check commands for more options
+
+```
+./setup.sh --help
+./target/release/rust-simple-tunnel --help
+```
+
+or simply use defaults options
 
 ```
 # first parameter - config to use
@@ -46,7 +53,7 @@ or
 
 ```
 # second parameter - destination to forward. use default to forward all traffic
-sudo ./run.sh examples/simple.txt 216.58.215.110
+sudo DEBUG=1 ./run.sh examples/simple.txt 216.58.215.110
 ```
 
 curl google.com
