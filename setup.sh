@@ -97,21 +97,34 @@ if [[ ! $(grep $route_table_name /etc/iproute2/rt_tables ) ]]; then
 fi
 
 # handle existing
-if [[ ! $(ip rule | grep "from all lookup $route_table_name") ]]; then
+if [[ ! $(ip rule | grep "from all ipproto tcp lookup $route_table_name") ]]; then
+    if [[ ! $clean ]]; then
+        ip rule add from all ipproto tcp lookup "$route_table_name" priority 500
+    fi
+else
     if [[ $clean ]]; then
         ip rule delete pref 500
-    else
-        ip rule add from all lookup "$route_table_name" priority 500
+    fi
+fi
+if [[ ! $(ip rule | grep "from all ipproto icmp lookup $route_table_name") ]]; then
+    if [[ ! $clean ]]; then
+        ip rule add from all ipproto icmp lookup "$route_table_name" priority 501
+    fi
+else
+    if [[ $clean ]]; then
+        ip rule delete pref 501
     fi
 fi
 if [[ ! $(ip rule | grep "from $tun_forward lookup main") ]]; then
+    if [[ ! $clean ]]; then
+        ip rule add from "$tun_forward" lookup main priority 300
+    fi
+else 
     if [[ $clean ]]; then
         ip rule delete pref 300
-    else
-        ip rule add from "$tun_forward" lookup main priority 300
     fi
 fi
 
-if [[ ! $(ip route show table $route_table_name 2>/dev/null ) ]]; then
+if [[ $(ip route show table $route_table_name 2>/dev/null ) ]]; then
     ip route flush table "$route_table_name"
 fi

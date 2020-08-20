@@ -33,24 +33,18 @@ fn process_receive(rules: RuleSet, mut dev: Device, interface_ip: &Ipv4Addr, for
         let amount = dev.read(&mut buf).expect("failed to read from device");
         match ip::Packet::new(&buf[..amount]) {
             Ok(ip::Packet::V4(pkt)) => {
-                debug!("Received: packet id {} src {} dst {}", pkt.id(), pkt.source(), pkt.destination());
 
-                // ignore packet same interface 
-                // if &pkt.source() == interface_ip && &pkt.destination() == forward_ip {
-                //     debug!("Ignore packet same interface: {:?}", pkt);
-                //     continue;
-                // }
+                // forward packet not for this interface
+                if &pkt.source() != interface_ip && &pkt.destination() != forward_ip {
+                    dev.write(pkt.as_ref()).expect("Failed to write to device");
+                    continue;
+                }
+
+                debug!("Received: packet id {} src {} dst {}", pkt.id(), pkt.source(), pkt.destination());
 
                 let matching_traffic = get_traffic_ip(&pkt, interface_ip);
                 if matching_traffic.is_none() {
-                    let result = create_packet(&pkt, &interface_ip, &forward_ip);
-                    if result.is_err() {
-                        warn!("Non tcp forward failed to create new packet. Ignoring. Message: {:?}", result);
-                        continue;
-                    }
-                    let new_packet = result.unwrap();
-                    debug!("Non tcp forward: packet id {} send src {} dst {}", new_packet.id(), new_packet.source(), new_packet.destination());
-                    dev.write(new_packet.as_ref()).expect("Failed to write to device");
+                    debug!("Ignore not matching traffic: packet id {} send src {} dst {}", pkt.id(), pkt.source(), pkt.destination());
                     continue;
                 }
 
