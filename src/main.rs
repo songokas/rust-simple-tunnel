@@ -36,13 +36,25 @@ fn process_receive(rules: RuleSet, mut dev: Device, interface_ip: &Ipv4Addr, for
                 debug!("Received: packet id {} src {} dst {}", pkt.id(), pkt.source(), pkt.destination());
 
                 // ignore packet same interface 
-                if &pkt.source() == interface_ip && &pkt.destination() == forward_ip {
-                    debug!("Ignore packet same interface: {:?}", pkt);
+                // if &pkt.source() == interface_ip && &pkt.destination() == forward_ip {
+                //     debug!("Ignore packet same interface: {:?}", pkt);
+                //     continue;
+                // }
+
+                let matching_traffic = get_traffic_ip(&pkt, interface_ip);
+                if matching_traffic.is_none() {
+                    let result = create_packet(&pkt, &interface_ip, &forward_ip);
+                    if result.is_err() {
+                        warn!("Non tcp forward failed to create new packet. Ignoring. Message: {:?}", result);
+                        continue;
+                    }
+                    let new_packet = result.unwrap();
+                    debug!("Non tcp forward: packet id {} send src {} dst {}", new_packet.id(), new_packet.source(), new_packet.destination());
+                    dev.write(new_packet.as_ref()).expect("Failed to write to device");
                     continue;
                 }
 
-                let (traffic_ip, mut local_port) = get_traffic_ip(&pkt, interface_ip);
-
+                let (traffic_ip, mut local_port) = matching_traffic.unwrap();
                 if let Some(rule) = get_matching_rule(&rules, &IpAddr::V4(traffic_ip)) {
 
                     // for byte based rule local port is ignored
@@ -60,7 +72,12 @@ fn process_receive(rules: RuleSet, mut dev: Device, interface_ip: &Ipv4Addr, for
 
                     if can_forward(rule, record) {
 
-                        let new_packet = create_packet(&pkt, &interface_ip, &forward_ip);
+                        let result = create_packet(&pkt, &interface_ip, &forward_ip);
+                        if result.is_err() {
+                            warn!("Forward failed unable to create new packet. Message: {:?}", result);
+                            continue;
+                        }
+                        let new_packet = result.unwrap();
                         debug!(
                             "Matching forward: packet id {} send src {} dst {} checksum {:X}", 
                             new_packet.id(), new_packet.source(), new_packet.destination(), new_packet.checksum()
@@ -75,7 +92,13 @@ fn process_receive(rules: RuleSet, mut dev: Device, interface_ip: &Ipv4Addr, for
                         }
                     }
                 } else {
-                    let new_packet = create_packet(&pkt, &interface_ip, &forward_ip);
+                    let result = create_packet(&pkt, &interface_ip, &forward_ip);
+                    if result.is_err() {
+                        warn!("Not matching forward failed to create new packet. Message: {:?}", result);
+                        continue;
+                    }
+                    let new_packet = result.unwrap();
+
                     debug!("Not matching forward: packet id {} send src {} dst {}", new_packet.id(), new_packet.source(), new_packet.destination());
 
                     dev.write(new_packet.as_ref()).expect("Failed to write to device");

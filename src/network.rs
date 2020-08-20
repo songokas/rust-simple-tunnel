@@ -1,28 +1,28 @@
-use packet::{ip, tcp};
+use packet::{ip, tcp, Error};
 use packet::ip::{Protocol};
 use packet::{Packet, PacketMut};
 use tun::platform::Device;
 use tun::{configure};
 use std::net::{Ipv4Addr};
 
-pub fn get_traffic_ip(pkt: &ip::v4::Packet<&[u8]>, interface_ip: &Ipv4Addr) -> (Ipv4Addr, u16)
+pub fn get_traffic_ip(pkt: &ip::v4::Packet<&[u8]>, interface_ip: &Ipv4Addr) -> Option<(Ipv4Addr, u16)>
 {
-    let mut local_port: u16 = 0;
-    if pkt.protocol() == Protocol::Tcp {
-        let tcp = tcp::Packet::new(pkt.payload()).unwrap();
-        local_port = if &pkt.source() == interface_ip {
-            tcp.source()
-        } else {
-            tcp.destination()
-        };
+    if pkt.protocol() != Protocol::Tcp {
+        return None;
     }
+    let tcp = tcp::Packet::new(pkt.payload()).ok()?;
+    let local_port = if &pkt.source() == interface_ip {
+        tcp.source()
+    } else {
+        tcp.destination()
+    };
 
     let traffic_ip = if &pkt.source() == interface_ip {
         pkt.destination()
     } else {
         pkt.source()
     };
-    (traffic_ip, local_port)
+    Some((traffic_ip, local_port))
 }
 
 pub fn create_tunnel(name: &str, ip: &Ipv4Addr) -> Device
@@ -39,16 +39,16 @@ pub fn create_tunnel(name: &str, ip: &Ipv4Addr) -> Device
     tun::create(&config).expect("Unable to create tunnel. Please use root or sudo")
 }
 
-pub fn create_packet(packet: &ip::v4::Packet<&[u8]>, interface_ip: &Ipv4Addr, forward_ip: &Ipv4Addr) -> ip::v4::Packet<Vec<u8>>
+pub fn create_packet(packet: &ip::v4::Packet<&[u8]>, interface_ip: &Ipv4Addr, forward_ip: &Ipv4Addr) -> Result<ip::v4::Packet<Vec<u8>>, Error>
 {
-    let mut new_packet = ip::v4::Packet::new(packet.as_ref().to_vec()).unwrap();
+    let mut new_packet = ip::v4::Packet::new(packet.as_ref().to_vec())?;
     let mut tcp_checksum_change = 0;
     if &packet.source() == interface_ip {
-        new_packet.checked().set_source(forward_ip.clone()).unwrap();
+        new_packet.checked().set_source(forward_ip.clone())?;
         tcp_checksum_change = -1;
 
     } else if &packet.destination() == forward_ip {
-        new_packet.checked().set_destination(interface_ip.clone()).unwrap();
+        new_packet.checked().set_destination(interface_ip.clone())?;
         tcp_checksum_change = 1;
     }
 
@@ -57,14 +57,14 @@ pub fn create_packet(packet: &ip::v4::Packet<&[u8]>, interface_ip: &Ipv4Addr, fo
         if let Ok(mut tcp) = tcp::Packet::new(tcp_payload) {
             //@TODO find out why tcp.update_checksum does not work
             if tcp_checksum_change == -1 {
-                tcp.set_checksum(tcp.checksum() - 1).unwrap();
+                tcp.set_checksum(tcp.checksum() - 1)?;
             } else if tcp_checksum_change == 1 {
-                tcp.set_checksum(tcp.checksum() + 1).unwrap();
+                tcp.set_checksum(tcp.checksum() + 1)?;
             }
         }
     }
 
-    new_packet
+    Ok(new_packet)
 }
 
 
@@ -88,7 +88,7 @@ mod tests {
 		assert!(mock_packet.is_valid());
 		assert!(tcp.is_valid(&packet::ip::Packet::from(&mock_packet)));
 
-        let packet = create_packet(&mock_packet, &interface_src, &interface_forward);
+        let packet = create_packet(&mock_packet, &interface_src, &interface_forward).unwrap();
 
         assert_eq!(packet.source(), interface_forward);
         assert_eq!(packet.destination(), packet_dst);
@@ -115,7 +115,7 @@ mod tests {
 		assert!(mock_packet.is_valid());
 		assert!(tcp.is_valid(&packet::ip::Packet::from(&mock_packet)));
 
-        let packet = create_packet(&mock_packet, &interface_src, &interface_forward);
+        let packet = create_packet(&mock_packet, &interface_src, &interface_forward).unwrap();
 
         assert_eq!(packet.source(), packet_src);
         assert_eq!(packet.destination(), interface_src);
