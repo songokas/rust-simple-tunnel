@@ -1,13 +1,13 @@
 # About
 
-simple rust application to filter traffic through tun0 interface
+simple rust application to filter tcp and icmp traffic through tun0 interface
 
 linux only
 
 # Dependencies
 
 * cargo - to compile application
-* nft or iptables - for traffic forwarding and masquarade
+* iptables - for traffic forwarding and masquarade
 * ip - for traffic rules
 * grep - in setup.sh for rule manipulation
 * awk - in setup.sh for rule manipulation
@@ -27,7 +27,7 @@ cargo build --release
 ```
 # apply network rules for tun0
 sudo ./setup.sh
-# --forward-traffic: use default or specify network 8.8.8.0/24 or do not provide it
+# run application --forward-traffic: use default or specify network 8.8.8.0/24 or do not provide it
 sudo ./target/release/rust-simple-tunnel -c examples/simple.txt --forward-traffic "8.8.8.8" --verbose
 ```
 
