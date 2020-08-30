@@ -65,6 +65,7 @@ pub fn can_forward(rule: &LimitRule, record: &RouteRecord) -> bool
 mod tests
 {
     use super::*;
+    use crate::ruleset::LimitAddress;
     use chrono::Local;
     use ipnetwork::IpNetwork;
 
@@ -74,56 +75,83 @@ mod tests
             (
                 "equal bytes",
                 false,
-                LimitRule::from_bytes(&"127.0.0.1/24".parse::<IpNetwork>().unwrap(), 100),
+                LimitRule::from_bytes(
+                    &LimitAddress::from_network(&"127.0.0.1/24".parse::<IpNetwork>().unwrap()),
+                    100,
+                ),
                 RouteRecord::new(&Local::now(), 100),
             ),
             (
                 "used bytes",
                 false,
-                LimitRule::from_bytes(&"127.0.0.1/24".parse::<IpNetwork>().unwrap(), 100),
+                LimitRule::from_bytes(
+                    &LimitAddress::from_network(&"127.0.0.1/24".parse::<IpNetwork>().unwrap()),
+                    100,
+                ),
                 RouteRecord::new(&Local::now(), 101),
             ),
             (
                 "no bytes",
                 false,
-                LimitRule::from_bytes(&"127.0.0.1/24".parse::<IpNetwork>().unwrap(), 0),
+                LimitRule::from_bytes(
+                    &LimitAddress::from_network(&"127.0.0.1/24".parse::<IpNetwork>().unwrap()),
+                    0,
+                ),
                 RouteRecord::new(&Local::now(), 0),
             ),
             (
                 "1 byte left",
                 true,
-                LimitRule::from_bytes(&"127.0.0.1/24".parse::<IpNetwork>().unwrap(), 101),
+                LimitRule::from_bytes(
+                    &LimitAddress::from_network(&"127.0.0.1/24".parse::<IpNetwork>().unwrap()),
+                    101,
+                ),
                 RouteRecord::new(&Local::now(), 100),
             ),
             (
                 "100 bytes left",
                 true,
-                LimitRule::from_bytes(&"127.0.0.1/24".parse::<IpNetwork>().unwrap(), 100),
+                LimitRule::from_bytes(
+                    &LimitAddress::from_network(&"127.0.0.1/24".parse::<IpNetwork>().unwrap()),
+                    100,
+                ),
                 RouteRecord::new(&Local::now(), 0),
             ),
             // records are in the past
             (
                 "10 remains",
                 true,
-                LimitRule::from_duration(&"127.0.0.1/24".parse::<IpNetwork>().unwrap(), 10),
+                LimitRule::from_duration(
+                    &LimitAddress::from_network(&"127.0.0.1/24".parse::<IpNetwork>().unwrap()),
+                    10,
+                ),
                 RouteRecord::new(&Local::now(), 0),
             ),
             (
                 "1 remains",
                 true,
-                LimitRule::from_duration(&"127.0.0.1/24".parse::<IpNetwork>().unwrap(), 10),
+                LimitRule::from_duration(
+                    &LimitAddress::from_network(&"127.0.0.1/24".parse::<IpNetwork>().unwrap()),
+                    10,
+                ),
                 RouteRecord::new(&(Local::now() - ChronoDuration::seconds(9)), 0),
             ),
             (
                 "0 remains",
                 false,
-                LimitRule::from_duration(&"127.0.0.1/24".parse::<IpNetwork>().unwrap(), 10),
+                LimitRule::from_duration(
+                    &LimitAddress::from_network(&"127.0.0.1/24".parse::<IpNetwork>().unwrap()),
+                    10,
+                ),
                 RouteRecord::new(&(Local::now() - ChronoDuration::seconds(10)), 0),
             ),
             (
                 "used 1",
                 false,
-                LimitRule::from_duration(&"127.0.0.1/24".parse::<IpNetwork>().unwrap(), 10),
+                LimitRule::from_duration(
+                    &LimitAddress::from_network(&"127.0.0.1/24".parse::<IpNetwork>().unwrap()),
+                    10,
+                ),
                 RouteRecord::new(&(Local::now() - ChronoDuration::seconds(11)), 0),
             ),
         ]
@@ -133,9 +161,18 @@ mod tests
     fn get_matching_rule_test()
     {
         let rules = vec![
-            LimitRule::from_duration(&"127.0.0.1/24".parse::<IpNetwork>().unwrap(), 120),
-            LimitRule::from_duration(&"10.0.0.0/8".parse::<IpNetwork>().unwrap(), 120),
-            LimitRule::from_duration(&"10.168.0.0/16".parse::<IpNetwork>().unwrap(), 120),
+            LimitRule::from_duration(
+                &LimitAddress::from_network(&"127.0.0.1/24".parse::<IpNetwork>().unwrap()),
+                120,
+            ),
+            LimitRule::from_duration(
+                &LimitAddress::from_network(&"10.0.0.0/8".parse::<IpNetwork>().unwrap()),
+                120,
+            ),
+            LimitRule::from_duration(
+                &LimitAddress::from_network(&"10.168.0.0/16".parse::<IpNetwork>().unwrap()),
+                120,
+            ),
         ];
         assert_eq!(
             &rules[0],

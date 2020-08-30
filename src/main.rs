@@ -20,7 +20,7 @@ pub mod record;
 use crate::record::{can_forward, get_matching_rule, Records, RouteRecord};
 #[path = "ruleset.rs"]
 pub mod ruleset;
-use crate::ruleset::{load_rules, LimitRule, LimitType, RuleSet, update_dns};
+use crate::ruleset::{load_rules, update_dns, LimitRule, LimitType, RuleSet};
 #[path = "network.rs"]
 pub mod network;
 use crate::network::{create_packet, create_tunnel, get_traffic_ip};
@@ -294,8 +294,6 @@ async fn process_receive(
         }
     }
 }
-
-
 
 #[tokio::main]
 async fn main() -> Result<(), CliError>

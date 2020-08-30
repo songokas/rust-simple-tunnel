@@ -830,6 +830,29 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "427c3892f9e783d91cc128285287e70a59e206ca452770ece88a76f7a3eddd72"
 
 [[package]]
+name = "pcre2"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3ae0a2682105ec5ca0ee5910bbc7e926386d348a05166348f74007942983c319"
+dependencies = [
+ "libc",
+ "log",
+ "pcre2-sys",
+ "thread_local 0.3.6",
+]
+
+[[package]]
+name = "pcre2-sys"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a9027f9474e4e13d3b965538aafcaebe48c803488ad76b3c97ef061a8324695f"
+dependencies = [
+ "cc",
+ "libc",
+ "pkg-config",
+]
+
+[[package]]
 name = "percent-encoding"
 version = "2.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1019,7 +1042,7 @@ dependencies = [
  "aho-corasick",
  "memchr",
  "regex-syntax",
- "thread_local",
+ "thread_local 1.0.1",
 ]
 
 [[package]]
@@ -1085,6 +1108,7 @@ dependencies = [
  "ipnetwork",
  "log",
  "packet",
+ "pcre2",
  "tokio",
  "tokio-util",
  "tun",
@@ -1307,6 +1331,15 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "thread_local"
+version = "0.3.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c6b53e329000edc2b34dbe8545fd20e55a333362d0a321909685a19bd28c3f1b"
+dependencies = [
+ "lazy_static",
 ]
 
 [[package]]
