@@ -1,14 +1,17 @@
-use ipnetwork::IpNetwork;
-use byte_unit::{Byte};
-use std::io::{BufReader};
-use std::io::prelude::*;
-use std::fs::File;
-use std::net::{IpAddr};
 use crate::error::{CliError, RuleError};
+use byte_unit::Byte;
+use ipnetwork::IpNetwork;
+use std::fs::File;
+use std::io::prelude::*;
+use std::io::BufReader;
+use std::net::IpAddr;
+use tokio::net::lookup_host;
+use chrono::{DateTime, Local};
+use log::{debug};
 
 pub type RuleSet = Vec<LimitRule>;
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Clone)]
 pub enum LimitType
 {
     // in seconds
@@ -17,28 +20,124 @@ pub enum LimitType
     MaxData(u128),
 }
 
-#[derive(Debug, PartialEq)]
-pub struct LimitRule
+#[derive(Debug, PartialEq, Clone)]
+pub struct LimitAddress
 {
-    pub address: IpNetwork,
-    pub limit: LimitType
+    unresolved: String,
+    network: Option<IpNetwork>,
+    dns_ttl: Option<DateTime<Local>>
 }
 
-impl LimitRule
+impl LimitAddress
 {
-    pub fn from_duration(address: &IpNetwork, duration: u64) -> Self
-    {
-        LimitRule { address: address.clone(), limit: LimitType::Duration(duration) }
-    } 
 
-    pub fn from_bytes(address: &IpNetwork, bytes: u128) -> Self
+    pub fn new(unresolved: &str, network: &IpNetwork) -> Self
     {
-        LimitRule { address: address.clone(), limit: LimitType::MaxData(bytes) }
+        LimitAddress {
+            unresolved: unresolved.to_owned(),
+            network: Some(network.clone()),
+            dns_ttl: Some(Local::now())
+        }
+    }
+
+    pub fn unresolved(dns: &str) -> Self
+    {
+        LimitAddress {
+            unresolved: dns.to_owned(),
+            network: None,
+            dns_ttl: None
+        }
     }
 
     pub fn contains(&self, ip: &IpAddr) -> bool
     {
-        self.address.contains(ip.clone())
+        if let Some(addr) = self.network { 
+            addr.contains(ip.clone()) 
+        } else {
+            false
+        }
+    }
+
+    pub fn unresolved_ip(&self) -> &str
+    {
+        &self.unresolved
+    }
+
+    pub fn is_expired(&self) -> bool
+    {
+        if let Some(ttl) = self.dns_ttl {
+            Local::now() > ttl
+        } else {
+            false
+        }
+    }
+
+    pub fn update_dns(&self, network: &IpNetwork) -> Self
+    {
+        Self::new(&self.unresolved, network)
+    }
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct LimitRule
+{
+    address: LimitAddress,
+    limit: LimitType,
+}
+
+impl LimitRule
+{
+
+    pub fn new(address: &LimitAddress, limit: &LimitType) -> Self
+    {
+        LimitRule {
+            address: address.clone(),
+            limit: limit.clone()
+        }
+    }
+
+    pub fn from_duration(address: &LimitAddress, duration: u64) -> Self
+    {
+        LimitRule {
+            address: address.clone(),
+            limit: LimitType::Duration(duration),
+        }
+    }
+
+    pub fn from_bytes(address: &LimitAddress, bytes: u128) -> Self
+    {
+        LimitRule {
+            address: address.clone(),
+            limit: LimitType::MaxData(bytes),
+        }
+    }
+
+    pub fn contains(&self, ip: &IpAddr) -> bool
+    {
+        self.address.contains(ip)
+    }
+
+    pub fn update_dns(&self, network: &IpNetwork) -> Self
+    {
+        Self::new(
+            &self.address.update_dns(network),
+            &self.limit
+        )
+    }
+
+    pub fn limit(&self) -> LimitType
+    {
+        self.limit.clone()
+    }
+
+    pub fn unresolved_ip(&self) -> &str
+    {
+        self.address.unresolved_ip()
+    }
+
+    pub fn is_expired(&self) -> bool
+    {
+        self.address.is_expired()
     }
 }
 
@@ -57,8 +156,9 @@ pub fn load_rules(file_path: &str) -> Result<RuleSet, CliError>
         if !(ip.is_some() && rule_type.is_some()) {
             continue;
         }
-        let rule = create_rule(ip.unwrap().trim(), rule_type.unwrap().trim())
-            .map_err(|msg| { CliError::SyntaxError(format!("Syntax error line {} {:?}", line_number, msg))})?;
+        let rule = create_rule(ip.unwrap().trim(), rule_type.unwrap().trim()).map_err(|msg| {
+            CliError::SyntaxError(format!("Syntax error line {} {:?}", line_number, msg))
+        })?;
 
         rules.push(rule);
         line_number += 1;
@@ -68,36 +168,108 @@ pub fn load_rules(file_path: &str) -> Result<RuleSet, CliError>
 
 fn create_rule(ip: &str, rule_type: &str) -> Result<LimitRule, RuleError>
 {
-    let ip_addr: IpNetwork = ip.parse::<IpNetwork>()?;
+    let addr = match ip.parse::<IpNetwork>() {
+        Ok(network) => LimitAddress::new(ip, &network),
+        Err(_) => LimitAddress::unresolved(ip)
+    };
 
-    let byte_rule = Byte::from_str(rule_type)
-        .map(|byte| LimitRule::from_bytes(&ip_addr, byte.get_bytes()));
-    let duration_rule = rule_type.parse::<humantime::Duration>()
-        .map(|duration| LimitRule::from_duration(&ip_addr, duration.as_secs()));
+
+    let byte_rule =
+        Byte::from_str(rule_type).map(|byte| LimitRule::from_bytes(&addr, byte.get_bytes()));
+    let duration_rule = rule_type
+        .parse::<humantime::Duration>()
+        .map(|duration| LimitRule::from_duration(&addr, duration.as_secs()));
     let rule = duration_rule.or(byte_rule)?;
 
     Ok(rule)
 }
 
+async fn retrieve_network(dns: &str) -> Result<IpNetwork, RuleError>
+{
+    let mut result = lookup_host(format!("{}:80", dns)).await
+        .map_err(|error| RuleError::InvalidNetwork(format!("Dns lookup failed. {:?}", error)))?;
+
+
+    if let Some(sock_addr) = result.next() {
+        return IpNetwork::new(sock_addr.ip(), 32)
+            .map_err(|error| RuleError::InvalidNetwork(format!("Dns lookup failed. {:?}", error)));
+    }
+    Err(RuleError::InvalidNetwork(format!("Dns lookup failed. No addr returned")))
+}
+
+pub async fn update_dns(rules: &RuleSet) -> RuleSet
+{
+    let mut new_rules = RuleSet::new();
+    for rule in rules.iter() {
+        let new_rule = if rule.is_expired() {
+            let result = retrieve_network(rule.unresolved_ip()).await;
+            if !result.is_ok() {
+                debug!("Dns lookup failed: {:?}", result);
+                continue;
+            }
+            let new_rule = rule.update_dns(&result.unwrap());
+            debug!("Dns update success. Previous {:?} Current {:?}", rule, new_rule);
+            new_rule
+        } else {
+            rule.clone()
+        };
+        new_rules.push(new_rule);
+    }
+    new_rules
+}
 
 #[cfg(test)]
-mod tests {
+mod tests
+{
     use super::*;
     use std::net::{IpAddr, Ipv4Addr};
 
     fn rule_success_data_provider() -> Vec<(&'static str, &'static str, LimitRule)>
     {
         vec![
-            ("127.0.0.1", "2m", LimitRule::from_duration(&"127.0.0.1".parse::<IpNetwork>().unwrap(), 120)),
-            ("8.8.8.8/32", "12s", LimitRule::from_duration(&"8.8.8.8/32".parse::<IpNetwork>().unwrap(), 12)),
-            ("12.10.0.1/24", "4h", LimitRule::from_duration(&"12.10.0.1/24".parse::<IpNetwork>().unwrap(), 14400)),
-            ("0.0.0.0/0", "2 hours 20 seconds", LimitRule::from_duration(&"0.0.0.0/0".parse::<IpNetwork>().unwrap(), 7220)),
-            ("192.168.0.255/0", "2mb", LimitRule::from_bytes(&"192.168.0.255/0".parse::<IpNetwork>().unwrap(), 2 * 1000 * 1000)),
-            ("1.1.1.1/32", "1.5gb", LimitRule::from_bytes(&"1.1.1.1/32".parse::<IpNetwork>().unwrap(), 15 * 100 * 1000 * 1000)),
-            ("8.8.8.81", "12Kib", LimitRule::from_bytes(&"8.8.8.81".parse::<IpNetwork>().unwrap(), 12 * 1024)),
+            (
+                "127.0.0.1",
+                "2m",
+                LimitRule::from_duration(&"127.0.0.1".parse::<IpNetwork>().unwrap(), 120),
+            ),
+            (
+                "8.8.8.8/32",
+                "12s",
+                LimitRule::from_duration(&"8.8.8.8/32".parse::<IpNetwork>().unwrap(), 12),
+            ),
+            (
+                "12.10.0.1/24",
+                "4h",
+                LimitRule::from_duration(&"12.10.0.1/24".parse::<IpNetwork>().unwrap(), 14400),
+            ),
+            (
+                "0.0.0.0/0",
+                "2 hours 20 seconds",
+                LimitRule::from_duration(&"0.0.0.0/0".parse::<IpNetwork>().unwrap(), 7220),
+            ),
+            (
+                "192.168.0.255/0",
+                "2mb",
+                LimitRule::from_bytes(
+                    &"192.168.0.255/0".parse::<IpNetwork>().unwrap(),
+                    2 * 1000 * 1000,
+                ),
+            ),
+            (
+                "1.1.1.1/32",
+                "1.5gb",
+                LimitRule::from_bytes(
+                    &"1.1.1.1/32".parse::<IpNetwork>().unwrap(),
+                    15 * 100 * 1000 * 1000,
+                ),
+            ),
+            (
+                "8.8.8.81",
+                "12Kib",
+                LimitRule::from_bytes(&"8.8.8.81".parse::<IpNetwork>().unwrap(), 12 * 1024),
+            ),
         ]
     }
-
 
     fn rule_failure_data_provider() -> Vec<(&'static str, &'static str)>
     {
@@ -113,7 +285,8 @@ mod tests {
     }
 
     #[test]
-    fn create_rule_success_test() {
+    fn create_rule_success_test()
+    {
         for (ip, limit_type, rule) in rule_success_data_provider() {
             let result = create_rule(ip, limit_type);
             assert_eq!(result.unwrap(), rule);
@@ -121,7 +294,8 @@ mod tests {
     }
 
     #[test]
-    fn create_rule_failure_test() {
+    fn create_rule_failure_test()
+    {
         for (ip, limit_type) in rule_failure_data_provider() {
             let result = create_rule(ip, limit_type);
             assert!(result.is_err());
@@ -142,7 +316,10 @@ mod tests {
     fn load_rules_test()
     {
         let expected = vec![
-            LimitRule::from_bytes(&"80.249.99.148/32".parse::<IpNetwork>().unwrap(), 11000000000),
+            LimitRule::from_bytes(
+                &"80.249.99.148/32".parse::<IpNetwork>().unwrap(),
+                11000000000,
+            ),
             LimitRule::from_duration(&"94.142.241.111/24".parse::<IpNetwork>().unwrap(), 120),
             LimitRule::from_bytes(&"192.168.0.0/24".parse::<IpNetwork>().unwrap(), 2097152),
             LimitRule::from_duration(&"192.168.0.161".parse::<IpNetwork>().unwrap(), 130),
