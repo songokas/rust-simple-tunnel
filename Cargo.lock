@@ -807,9 +807,8 @@ dependencies = [
 
 [[package]]
 name = "packet"
-version = "0.1.3"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1f6d388ce0e344fdb4f0bd5a39c603f7c327a859c111c825a140cb54dd993e9e"
+version = "0.1.2"
+source = "git+https://github.com/songokas/rust-packet?branch=master#623decda92c2197baa2e314b45d10a10b804275f"
 dependencies = [
  "bitflags 1.2.1",
  "byteorder",

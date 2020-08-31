@@ -49,41 +49,19 @@ pub fn create_packet<T: std::convert::AsRef<[u8]>>(
 {
     let mut new_packet = ip::v4::Packet::new(packet.as_ref().to_vec())?;
 
-    let mut tcp_checksum_change = 0;
     if &packet.source() == interface_ip {
-         new_packet.checked().set_source(forward_ip.clone())?;
-        tcp_checksum_change = -1;
-     } else if &packet.destination() == forward_ip {
-         new_packet.checked().set_destination(interface_ip.clone())?;
-        tcp_checksum_change = 1;
-     }
-
-     if packet.protocol() == Protocol::Tcp {
-        let (_, tcp_payload) = new_packet.split_mut();
-        if let Ok(mut tcp) = tcp::Packet::new(tcp_payload) {
-            //@TODO find out why tcp.update_checksum does not work
-            if tcp_checksum_change == -1 {
-               tcp.set_checksum(tcp.checksum() - 1)?;
-           } else if tcp_checksum_change == 1 {
-                tcp.set_checksum(tcp.checksum() + 1)?;
-            }
-        }
+        new_packet.checked().set_source(forward_ip.clone())?;
+    } else if &packet.destination() == forward_ip {
+        new_packet.checked().set_destination(interface_ip.clone())?;
     }
 
-    // requires bug fix for tcp checksum in the library
-    // if &packet.source() == interface_ip {
-    //     new_packet.checked().set_source(forward_ip.clone())?;
-    // } else if &packet.destination() == forward_ip {
-    //     new_packet.checked().set_destination(interface_ip.clone())?;
-    // }
-
-    // if packet.protocol() == Protocol::Tcp {
-    //     let packet_temp = new_packet.to_owned();
-    //     if let Ok(mut tcp) = tcp::Packet::new(new_packet.payload_mut()) {
-    //         let ip = ip::Packet::from(&packet_temp);
-    //         tcp.update_checksum(&ip).unwrap();
-    //     }
-    // }
+    if packet.protocol() == Protocol::Tcp {
+        let packet_temp = new_packet.to_owned();
+        if let Ok(mut tcp) = tcp::Packet::new(new_packet.payload_mut()) {
+            let ip = ip::Packet::from(&packet_temp);
+            tcp.update_checksum(&ip).unwrap();
+        }
+    }
     Ok(new_packet)
 }
 

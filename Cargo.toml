@@ -16,5 +16,5 @@ ipnetwork   = "~0.17.0"
 byte-unit = "~4.0.9"
 humantime = "~2.0.1"
 tun = { version = "0.5", features = ["async"] }
-packet = "0.1.3"
+packet = { git = "https://github.com/songokas/rust-packet", branch = "master" }
 pcre2 = "0.1"
