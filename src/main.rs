@@ -174,7 +174,7 @@ async fn get_record(
             .lock()
             .await
             .entry((traffic_ip.clone(), use_port))
-            .and_modify(|record| record.update_bytes(packet.length() as u128))
+            .and_modify(|record| *record = record.update_bytes(packet.length() as u128))
             .or_insert_with(|| RouteRecord::new(&Local::now(), packet.length().into()))
             .clone();
 

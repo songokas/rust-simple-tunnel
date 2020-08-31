@@ -1,6 +1,6 @@
 use crate::error::{CliError, RuleError};
 use byte_unit::Byte;
-use chrono::{DateTime, Local};
+use chrono::{DateTime, Duration, Local};
 use ipnetwork::IpNetwork;
 use log::debug;
 use pcre2::bytes::Regex;
@@ -77,16 +77,22 @@ impl LimitAddress
 
     pub fn is_expired(&self) -> bool
     {
-        if let Some(ttl) = self.dns_ttl {
-            Local::now() > ttl
-        } else {
-            false
+        if self.network.is_none() {
+            return true;
         }
+        if let Some(ttl) = self.dns_ttl {
+            return Local::now() > ttl;
+        }
+        false
     }
 
     pub fn update_dns(&self, network: &IpNetwork) -> Self
     {
-        Self::new(&self.unresolved, network, &Local::now())
+        Self::new(
+            &self.unresolved,
+            network,
+            &(Local::now() + Duration::seconds(3600)),
+        )
     }
 }
 

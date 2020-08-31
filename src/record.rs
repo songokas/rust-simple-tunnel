@@ -24,10 +24,9 @@ impl RouteRecord
         }
     }
 
-    pub fn update_bytes(&mut self, bytes: u128)
+    pub fn update_bytes(&self, bytes: u128) -> Self
     {
-        self.data_sent += bytes;
-        self.dtm = Local::now();
+        Self::new(&self.dt_start, self.data_sent + bytes)
     }
 
     pub fn is_valid(&self, expiration_time: &DateTime<Local>) -> bool
