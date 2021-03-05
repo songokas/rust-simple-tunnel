@@ -6,11 +6,15 @@ edition = "2018"
 
 [dependencies]
 clap = {version = "~2.27.0", features = ["yaml"]}
+tokio = { version = "0.2", features = ["full"] }
+tokio-util = { version = "0.3", features = ["codec"] }
+futures = "0.3"
 log = "~0.4.0"
 env_logger = "~0.7.0"
 chrono     = "0.4"
 ipnetwork   = "~0.17.0"
 byte-unit = "~4.0.9"
 humantime = "~2.0.1"
-tun = { version = "0.5" }
-packet     = "0.1"
+tun = { version = "0.5", features = ["async"] }
+packet = { git = "https://github.com/songokas/rust-packet", branch = "master" }
+pcre2 = "0.1"
